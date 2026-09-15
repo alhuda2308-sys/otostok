@@ -67,30 +67,49 @@ function mapPrismaCode(err: PrismaLikeError): { status: number; message: string 
  * Ubah error apa pun menjadi NextResponse JSON. SELALU mengembalikan JSON —
  * dipakai di blok catch semua route handler supaya klien tidak pernah
  * menerima body kosong / HTML error page.
+ *
+ * MODE DIAGNOSA: pesan error ASLI dari Prisma (err.message) dan kode error
+ * (err.code) dikirim langsung ke klien — tidak disembunyikan di balik pesan
+ * generik — supaya masalah produksi (tabel belum dibuat, DATABASE_URL salah,
+ * provider tidak cocok, dll.) langsung terlihat di layar /super-admin.
+ * Payload: { error: err.message, code: err.code, detail?, context }
  */
 export function dbErrorResponse(e: unknown, context: string): NextResponse {
   // Log detail lengkap utk Vercel Runtime Logs / dev.log
   console.error(`[api:${context}]`, e)
 
   const err = (e ?? {}) as PrismaLikeError
-  const msg = typeof err.message === 'string' ? err.message : ''
+  const rawMsg =
+    typeof err.message === 'string' && err.message.trim()
+      ? err.message.trim()
+      : 'Error tidak dikenal (tanpa pesan).'
+  const code = typeof err.code === 'string' && err.code ? err.code : 'UNKNOWN'
 
   // Prisma Client belum di-generate (mis. build tanpa `prisma generate`)
-  if (msg.includes('@prisma/client did not initialize yet')) {
+  if (rawMsg.includes('@prisma/client did not initialize yet')) {
     return NextResponse.json(
-      { error: 'Prisma Client belum di-generate. Jalankan `prisma generate` lalu deploy ulang.' },
+      {
+        error: 'Prisma Client belum di-generate. Jalankan `prisma generate` lalu deploy ulang.',
+        code,
+        detail: rawMsg,
+        context,
+      },
       { status: 500 },
     )
   }
 
   const mapped = mapPrismaCode(err)
   if (mapped) {
-    return NextResponse.json({ error: mapped.message }, { status: mapped.status })
+    // Pesan ramah utk kode terkenal, ditambah pesan asli & kode utk diagnosa
+    return NextResponse.json(
+      { error: mapped.message, code, detail: rawMsg, context },
+      { status: mapped.status },
+    )
   }
 
-  // Error generik — pesan teknis tetap dicatat di log, klien dapat pesan aman
+  // Error generik/ tak-terpetakan — pesan ASLI langsung ke layar (mode diagnosa)
   return NextResponse.json(
-    { error: `Terjadi kesalahan server (${context}). Detail ada di log server.` },
+    { error: rawMsg, code, context },
     { status: 500 },
   )
 }

@@ -66,6 +66,25 @@ interface SuperLicenseRow {
   totalUnits: number
 }
 
+/** Payload error standar dari route handler (dbErrorResponse / validasi). */
+interface ApiErrorPayload {
+  error?: string
+  code?: string
+  detail?: string
+}
+
+/**
+ * Gabungkan pesan error + kode Prisma + pesan asli (detail) utk ditampilkan
+ * langsung di layar — mode diagnosa produksi, tidak ada pesan disembunyikan.
+ */
+function formatApiError(j: ApiErrorPayload, fallback: string): string {
+  const parts: string[] = []
+  if (j.code && j.code !== 'UNKNOWN') parts.push(`[${j.code}]`)
+  if (j.error) parts.push(j.error)
+  if (j.detail && j.detail !== j.error) parts.push(`— ${j.detail}`)
+  return parts.length ? parts.join(' ') : fallback
+}
+
 type EffectiveStatus = 'active' | 'near_expiry' | 'expired' | 'suspended'
 
 /** Status efektif: raw DB + kedaluwarsa lazily dari expiresAt. */
@@ -176,8 +195,8 @@ export function SuperAdminClient() {
         return
       }
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal memuat data lisensi.')
+        const j = (await res.json().catch(() => ({}))) as ApiErrorPayload
+        throw new Error(formatApiError(j, 'Gagal memuat data lisensi.'))
       }
       // Parse aman: body kosong/non-JSON tidak boleh melempar "Unexpected end of JSON input"
       const j = (await res.json().catch(() => ({}))) as { licenses?: SuperLicenseRow[] }
@@ -328,16 +347,17 @@ export function SuperAdminClient() {
       }
       // Parse aman — body kosong/non-JSON (mis. error platform/gateway) tetap
       // menghasilkan pesan error yang jelas, bukan "Unexpected end of JSON input".
-      const j = (await res.json().catch(() => ({}))) as {
-        error?: string
+      const j = (await res.json().catch(() => ({}))) as ApiErrorPayload & {
         license?: SuperLicenseRow
       }
       if (!res.ok) {
         throw new Error(
-          j.error ||
-            (res.status === 405
+          formatApiError(
+            j,
+            res.status === 405
               ? 'Endpoint tidak tersedia di deployment ini — pastikan Vercel memakai commit terbaru.'
-              : `Gagal membuat lisensi. (HTTP ${res.status})`),
+              : `Gagal membuat lisensi. (HTTP ${res.status})`,
+          ),
         )
       }
       if (!j.license) throw new Error('Respons server tidak dikenal. Coba lagi.')
@@ -365,8 +385,8 @@ export function SuperAdminClient() {
         await refetch()
         return
       }
-      const j = (await res.json().catch(() => ({}))) as { error?: string }
-      if (!res.ok) throw new Error(j.error || `Aksi gagal. (HTTP ${res.status})`)
+      const j = (await res.json().catch(() => ({}))) as ApiErrorPayload
+      if (!res.ok) throw new Error(formatApiError(j, `Aksi gagal. (HTTP ${res.status})`))
       if (action === 'extend') toast.success(`+30 hari — masa aktif kini ${expiryLabel(row)}`)
       if (action === 'suspend') toast.success(`${row.licenseKey} dibekukan (suspend).`)
       if (action === 'unsuspend') toast.success(`${row.licenseKey} dibuka kembali.`)
