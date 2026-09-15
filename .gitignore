@@ -61,3 +61,4 @@ db/
 agent-ctx/
 download/
 *.pid
+upload/
