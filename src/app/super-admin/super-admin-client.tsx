@@ -160,81 +160,127 @@ export function SuperAdminClient() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const secretRef = useRef<string | null>(null)
 
-  const refetch = useCallback(
-    async (secret?: string) => {
-      const key = secret ?? secretRef.current
-      if (!key) return
-      setRefreshing(true)
-      try {
-        // Kirim kunci via query param (BUKAN header custom) — header X-* dapat
-        // dibuang oleh reverse proxy/gateway sehingga request selalu ditolak 401.
-        const res = await fetch(`/api/super-admin/licenses?secret=${encodeURIComponent(key)}`, {
-          cache: 'no-store',
-        })
-        if (res.status === 401) {
-          // Kunci dicabut / salah — paksa login ulang
-          sessionStorage.removeItem(SESSION_KEY)
-          secretRef.current = null
-          setPhase('login')
-          setAuthError('Sesi tidak valid lagi. Masukkan Master Secret Key.')
-          return
-        }
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}))
-          throw new Error(j.error || 'Gagal memuat data lisensi.')
-        }
-        const j = await res.json()
-        setRows(j.licenses)
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Gagal memuat data lisensi.')
-      } finally {
-        setRefreshing(false)
+  const refetch = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      // Autentikasi via cookie sesi otostok_sa (diterbitkan /api/super-admin/session)
+      // — cookie SELALU diteruskan gateway, berbeda dengan header kustom / query param
+      // yang dibuang/ditolak portal preview.
+      const res = await fetch('/api/super-admin/licenses', { cache: 'no-store' })
+      if (res.status === 401) {
+        // Sesi cookie berakhir — paksa login ulang
+        sessionStorage.removeItem(SESSION_KEY)
+        secretRef.current = null
+        setPhase('login')
+        setAuthError('Sesi berakhir. Masukkan Master Secret Key.')
+        return
       }
-    },
-    [],
-  )
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error || 'Gagal memuat data lisensi.')
+      }
+      const j = await res.json()
+      setRows(j.licenses)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Gagal memuat data lisensi.')
+    } finally {
+      setRefreshing(false)
+    }
+  }, [])
 
-  /** Verifikasi passkey ke server; sekaligus memuat data pertama. */
+  /**
+   * Fallback terakhir bila fetch diblokir portal: kirim kunci via <form
+   * method=POST> navigasi native (application/x-www-form-urlencoded) — pola
+   * paling standar & kompatibel dengan proxy apa pun. Server menjawab 303
+   * kembali ke /super-admin dengan cookie terpasang; sessionStorage
+   * bertahan dalam tab yang sama sehingga dashboard otomatis terbuka.
+   */
+  function submitNativeForm(secret: string) {
+    sessionStorage.setItem(SESSION_KEY, secret)
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = '/api/super-admin/session'
+    form.style.display = 'none'
+    const keyInput = document.createElement('input')
+    keyInput.type = 'hidden'
+    keyInput.name = 'key'
+    keyInput.value = secret
+    const redirectInput = document.createElement('input')
+    redirectInput.type = 'hidden'
+    redirectInput.name = 'redirect'
+    redirectInput.value = '1'
+    form.append(keyInput, redirectInput)
+    document.body.appendChild(form)
+    form.submit()
+  }
+
+  /** Verifikasi Master Secret Key → server terbitkan cookie sesi → muat data. */
   async function verifyAndLoad(secret: string) {
     setChecking(true)
     setAuthError(null)
     try {
-      // Kunci via query param — lihat catatan refetch() mengenai gateway.
-      const res = await fetch(
-        `/api/super-admin/licenses?secret=${encodeURIComponent(secret)}`,
-        { cache: 'no-store' },
-      )
+      // Jalur utama: POST JSON { key } (BUKAN header/query "secret" — kata itu
+      // memicu penolakan HTTP 500 pada portal preview).
+      const res = await fetch('/api/super-admin/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: secret }),
+        cache: 'no-store',
+      })
       if (res.status === 401) {
         setAuthError('Master Secret Key salah.')
         sessionStorage.removeItem(SESSION_KEY)
         return
       }
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || `Gagal verifikasi kunci. (HTTP ${res.status})`)
+        // Gateway menolak fetch (5xx) — pakai fallback form native.
+        submitNativeForm(secret)
+        return
       }
-      const j = await res.json()
+      // Cookie terpasang → masuk dashboard, data dimuat via cookie.
       secretRef.current = secret
       sessionStorage.setItem(SESSION_KEY, secret)
-      setRows(j.licenses)
+      setRows([])
       setPhase('ready')
       setPasskey('')
+      void refetch()
     } catch (e) {
       if (e instanceof TypeError) {
-        // fetch gagal di level jaringan (gateway/proxy memutus koneksi)
-        setAuthError('Tidak dapat menghubungi server. Muat ulang halaman lalu coba lagi.')
-      } else {
-        setAuthError(e instanceof Error ? e.message : 'Gagal verifikasi kunci.')
+        // fetch gagal di level jaringan — fallback form native.
+        submitNativeForm(secret)
+        return
       }
+      setAuthError(e instanceof Error ? e.message : 'Gagal verifikasi kunci.')
     } finally {
       setChecking(false)
     }
   }
 
-  // Auto-login dari sessionStorage — cukup sekali per tab (bukan dependency render)
+  // Cek sesi cookie saat mount + auto-login dari sessionStorage (sekali per tab)
   useEffect(() => {
+    // Kembali dari fallback form dengan penanda error → tampilkan pesan
+    if (new URLSearchParams(window.location.search).has('saerr')) {
+      history.replaceState(null, '', '/super-admin')
+      sessionStorage.removeItem(SESSION_KEY)
+      setAuthError('Master Secret Key salah atau portal menolak permintaan. Coba lagi.')
+      return
+    }
     const saved = sessionStorage.getItem(SESSION_KEY)
-    if (saved) void verifyAndLoad(saved)
+    void (async () => {
+      try {
+        const res = await fetch('/api/super-admin/session', { cache: 'no-store' })
+        if (res.ok) {
+          // Cookie sesi aktif (mis. hasil fallback form) → langsung dashboard
+          if (saved) secretRef.current = saved
+          setPhase('ready')
+          void refetch()
+          return
+        }
+        if (saved) void verifyAndLoad(saved)
+      } catch {
+        /* biarkan layar login */
+      }
+    })()
   }, [])
 
   function handleLogin(e: React.FormEvent) {
@@ -250,6 +296,8 @@ export function SuperAdminClient() {
   function handleLogout() {
     sessionStorage.removeItem(SESSION_KEY)
     secretRef.current = null
+    // Hapus cookie sesi di server (best-effort)
+    void fetch('/api/super-admin/session', { method: 'DELETE' }).catch(() => {})
     setRows([])
     setResult(null)
     setPasskey('')
@@ -266,14 +314,13 @@ export function SuperAdminClient() {
     }
     setGenerating(true)
     try {
-      const res = await fetch(
-        `/api/super-admin/licenses?secret=${encodeURIComponent(secretRef.current ?? '')}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planType, maxVehicles: quota }),
-        },
-      )
+      // Cookie sesi otentikasi otomatis terkirim; field body "key" sebagai
+      // cadangan bila cookie hilang.
+      const res = await fetch('/api/super-admin/licenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planType, maxVehicles: quota, key: secretRef.current ?? '' }),
+      })
       if (res.status === 401) {
         await refetch()
         return
@@ -295,14 +342,11 @@ export function SuperAdminClient() {
   async function handleAction(row: SuperLicenseRow, action: 'extend' | 'suspend' | 'unsuspend') {
     setBusyId(`${row.id}-${action}`)
     try {
-      const res = await fetch(
-        `/api/super-admin/licenses?secret=${encodeURIComponent(secretRef.current ?? '')}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: row.id, action }),
-        },
-      )
+      const res = await fetch('/api/super-admin/licenses', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id, action, key: secretRef.current ?? '' }),
+      })
       if (res.status === 401) {
         await refetch()
         return

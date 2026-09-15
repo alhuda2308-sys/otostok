@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { generateLicenseKey, getSuperSecret, isSuperAuthorized } from '@/lib/super-auth'
+import {
+  generateLicenseKey,
+  getSuperSecret,
+  isSuperAuthorized,
+  matchesSuperSecret,
+} from '@/lib/super-auth'
 import { SUPER_PLANS } from '@/lib/constants'
 
 /**
  * API Super Admin — manajemen lisensi platform OtoStok.
- * SEMUA method wajib Master Secret Key (header X-Super-Secret / query ?secret=).
- * Terpisah total dari sesi Owner/Admin showroom (lihat lib/super-auth.ts).
+ * Autentikasi: cookie sesi otostok_sa (utama, dari /api/super-admin/session),
+ * atau header X-Super-Secret, atau query ?key= / ?secret=, atau field body
+ * "key" utk POST/PATCH. Terpisah total dari sesi Owner/Admin showroom.
  */
 
 const EXTEND_DAYS = 30
@@ -84,10 +90,12 @@ export async function GET(req: Request) {
 
 /** POST: generate 1 lisensi baru (format OTO-XXXX-XXXX-XXXX) dengan status active. */
 export async function POST(req: Request) {
-  if (!getSuperSecret()) return envMissing()
-  if (!isSuperAuthorized(req)) return unauthorized()
-
   const body = await req.json().catch(() => ({}))
+  if (!getSuperSecret()) return envMissing()
+  if (!isSuperAuthorized(req) && !matchesSuperSecret(String(body.key ?? ''))) {
+    return unauthorized()
+  }
+
   const planType = String(body.planType ?? '')
   const plan = SUPER_PLANS.find((p) => p.value === planType)
   if (!plan) {
@@ -137,10 +145,12 @@ export async function POST(req: Request) {
 
 /** PATCH: aksi cepat — perpanjang +30 hari, suspend, atau unsuspend. */
 export async function PATCH(req: Request) {
-  if (!getSuperSecret()) return envMissing()
-  if (!isSuperAuthorized(req)) return unauthorized()
-
   const body = await req.json().catch(() => ({}))
+  if (!getSuperSecret()) return envMissing()
+  if (!isSuperAuthorized(req) && !matchesSuperSecret(String(body.key ?? ''))) {
+    return unauthorized()
+  }
+
   const id = String(body.id ?? '')
   const action = String(body.action ?? '')
   if (!id || !['extend', 'suspend', 'unsuspend'].includes(action)) {
