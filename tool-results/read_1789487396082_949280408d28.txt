@@ -1,0 +1,864 @@
+     1→'use client'
+     2→
+     3→import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+     4→import { toast } from 'sonner'
+     5→import {
+     6→  BadgeCheck,
+     7→  Building2,
+     8→  CalendarClock,
+     9→  ClipboardCopy,
+    10→  Copy,
+    11→  KeyRound,
+    12→  Loader2,
+    13→  Lock,
+    14→  LockOpen,
+    15→  MessageCircle,
+    16→  PlusCircle,
+    17→  RefreshCcw,
+    18→  Search,
+    19→  ShieldCheck,
+    20→  Store,
+    21→  Ticket,
+    22→} from 'lucide-react'
+    23→import { Badge } from '@/components/ui/badge'
+    24→import { Button } from '@/components/ui/button'
+    25→import { Input } from '@/components/ui/input'
+    26→import {
+    27→  Select,
+    28→  SelectContent,
+    29→  SelectItem,
+    30→  SelectTrigger,
+    31→  SelectValue,
+    32→} from '@/components/ui/select'
+    33→import {
+    34→  Table,
+    35→  TableBody,
+    36→  TableCell,
+    37→  TableHead,
+    38→  TableHeader,
+    39→  TableRow,
+    40→} from '@/components/ui/table'
+    41→import { PLAN_LABELS, SUPER_PLANS } from '@/lib/constants'
+    42→import { copyToClipboard, formatDateID, formatPhoneDisplay, waLink } from '@/lib/format'
+    43→
+    44→/** Sesi Super Admin disimpan di sessionStorage (hilang saat tab ditutup). */
+    45→const SESSION_KEY = 'otostok_sa_key'
+    46→const DAY_MS = 24 * 60 * 60 * 1000
+    47→/** Ambang "segera kedaluwarsa" untuk badge kuning. */
+    48→const NEAR_EXPIRY_MS = 7 * DAY_MS
+    49→
+    50→interface SuperLicenseRow {
+    51→  id: string
+    52→  licenseKey: string
+    53→  planType: string
+    54→  maxVehicles: number
+    55→  status: string
+    56→  expiresAt: string | null
+    57→  createdAt: string
+    58→  showroom: {
+    59→    id: string
+    60→    name: string
+    61→    slug: string
+    62→    ownerPhone: string
+    63→    isActive: boolean
+    64→  } | null
+    65→  usedUnits: number
+    66→  totalUnits: number
+    67→}
+    68→
+    69→type EffectiveStatus = 'active' | 'near_expiry' | 'expired' | 'suspended'
+    70→
+    71→/** Status efektif: raw DB + kedaluwarsa lazily dari expiresAt. */
+    72→function effectiveStatus(row: SuperLicenseRow): EffectiveStatus {
+    73→  if (row.status === 'suspended') return 'suspended'
+    74→  if (row.expiresAt && new Date(row.expiresAt).getTime() < Date.now()) return 'expired'
+    75→  if (row.expiresAt && new Date(row.expiresAt).getTime() - Date.now() <= NEAR_EXPIRY_MS)
+    76→    return 'near_expiry'
+    77→  return 'active'
+    78→}
+    79→
+    80→const STATUS_BADGE: Record<EffectiveStatus, { label: string; className: string }> = {
+    81→  active: { label: 'Aktif', className: 'bg-emerald-600 text-white' },
+    82→  near_expiry: { label: 'Segera Habis', className: 'bg-amber-500 text-white' },
+    83→  expired: { label: 'Kedaluwarsa', className: 'bg-red-600 text-white' },
+    84→  suspended: { label: 'Suspended', className: 'bg-red-800 text-white' },
+    85→}
+    86→
+    87→function expiryLabel(row: SuperLicenseRow): string {
+    88→  if (!row.expiresAt) return 'Lifetime'
+    89→  return `s/d ${formatDateID(row.expiresAt)}`
+    90→}
+    91→
+    92→function planLabel(planType: string): string {
+    93→  const plan = SUPER_PLANS.find((p) => p.value === planType)
+    94→  return plan?.label ?? PLAN_LABELS[planType] ?? planType
+    95→}
+    96→
+    97→/** Template pesan WA siap kirim ke pembeli lisensi. */
+    98→function buildBuyerWaMessage(license: SuperLicenseRow): string {
+    99→  const lines: string[] = []
+   100→  lines.push('*OtoStok — AKTIVASI LISENSI*')
+   101→  lines.push('')
+   102→  lines.push(`Kode Lisensi : *${license.licenseKey}*`)
+   103→  lines.push(`Paket : ${planLabel(license.planType)}`)
+   104→  lines.push(`Kuota Unit : ${license.maxVehicles} motor`)
+   105→  lines.push(
+   106→    license.expiresAt
+   107→      ? `Masa Aktif : ${expiryLabel(license)}`
+   108→      : 'Masa Aktif : Lifetime (tanpa batas waktu)',
+   109→  )
+   110→  lines.push('')
+   111→  lines.push(`Aktivasi : ${window.location.origin}/activate`)
+   112→  lines.push('')
+   113→  lines.push('Cara aktivasi:')
+   114→  lines.push('1. Buka link di atas')
+   115→  lines.push('2. Masukkan kode lisensi')
+   116→  lines.push('3. Lengkapi data showroom & buat password owner')
+   117→  lines.push('4. Dashboard + katalog marketing langsung siap dipakai')
+   118→  lines.push('')
+   119→  lines.push('Butuh bantuan? Balas pesan ini.')
+   120→  return lines.join('\n')
+   121→}
+   122→
+   123→/** Ringkasan data lisensi utk tombol "Salin Info". */
+   124→function buildRowSummary(row: SuperLicenseRow): string {
+   125→  const st = STATUS_BADGE[effectiveStatus(row)].label
+   126→  const lines: string[] = []
+   127→  lines.push(`Lisensi: ${row.licenseKey} (${planLabel(row.planType)})`)
+   128→  lines.push(`Status: ${st}`)
+   129→  lines.push(
+   130→    row.showroom
+   131→      ? `Showroom: ${row.showroom.name} — /s/${row.showroom.slug}`
+   132→      : 'Showroom: belum diaktivasi',
+   133→  )
+   134→  if (row.showroom) {
+   135→    lines.push(`Owner WA: ${formatPhoneDisplay(row.showroom.ownerPhone)}`)
+   136→    lines.push(`Kuota: ${row.usedUnits}/${row.maxVehicles} unit (total tercatat ${row.totalUnits})`)
+   137→  }
+   138→  lines.push(`Masa aktif: ${expiryLabel(row)}`)
+   139→  lines.push(`Dibuat: ${formatDateID(row.createdAt)}`)
+   140→  return lines.join('\n')
+   141→}
+   142→
+   143→export function SuperAdminClient() {
+   144→  const [phase, setPhase] = useState<'login' | 'ready'>('login')
+   145→  const [passkey, setPasskey] = useState('')
+   146→  const [authError, setAuthError] = useState<string | null>(null)
+   147→  const [checking, setChecking] = useState(false)
+   148→
+   149→  const [rows, setRows] = useState<SuperLicenseRow[]>([])
+   150→  const [refreshing, setRefreshing] = useState(false)
+   151→  const [q, setQ] = useState('')
+   152→
+   153→  // Generator
+   154→  const [planType, setPlanType] = useState<string>('monthly')
+   155→  const [maxVehicles, setMaxVehicles] = useState('50')
+   156→  const [generating, setGenerating] = useState(false)
+   157→  const [result, setResult] = useState<SuperLicenseRow | null>(null)
+   158→
+   159→  // Per-baris busy state utk aksi cepat
+   160→  const [busyId, setBusyId] = useState<string | null>(null)
+   161→  const secretRef = useRef<string | null>(null)
+   162→
+   163→  const refetch = useCallback(
+   164→    async (secret?: string) => {
+   165→      const key = secret ?? secretRef.current
+   166→      if (!key) return
+   167→      setRefreshing(true)
+   168→      try {
+   169→        const res = await fetch('/api/super-admin/licenses', {
+   170→          headers: { 'X-Super-Secret': key },
+   171→          cache: 'no-store',
+   172→        })
+   173→        if (res.status === 401) {
+   174→          // Kunci dicabut / salah — paksa login ulang
+   175→          sessionStorage.removeItem(SESSION_KEY)
+   176→          secretRef.current = null
+   177→          setPhase('login')
+   178→          setAuthError('Sesi tidak valid lagi. Masukkan Master Secret Key.')
+   179→          return
+   180→        }
+   181→        if (!res.ok) {
+   182→          const j = await res.json().catch(() => ({}))
+   183→          throw new Error(j.error || 'Gagal memuat data lisensi.')
+   184→        }
+   185→        const j = await res.json()
+   186→        setRows(j.licenses)
+   187→      } catch (e) {
+   188→        toast.error(e instanceof Error ? e.message : 'Gagal memuat data lisensi.')
+   189→      } finally {
+   190→        setRefreshing(false)
+   191→      }
+   192→    },
+   193→    [],
+   194→  )
+   195→
+   196→  /** Verifikasi passkey ke server; sekaligus memuat data pertama. */
+   197→  async function verifyAndLoad(secret: string) {
+   198→    setChecking(true)
+   199→    setAuthError(null)
+   200→    try {
+   201→      const res = await fetch('/api/super-admin/licenses', {
+   202→        headers: { 'X-Super-Secret': secret },
+   203→        cache: 'no-store',
+   204→      })
+   205→      if (res.status === 401) {
+   206→        setAuthError('Master Secret Key salah.')
+   207→        sessionStorage.removeItem(SESSION_KEY)
+   208→        return
+   209→      }
+   210→      if (!res.ok) {
+   211→        const j = await res.json().catch(() => ({}))
+   212→        throw new Error(j.error || 'Gagal verifikasi kunci.')
+   213→      }
+   214→      const j = await res.json()
+   215→      secretRef.current = secret
+   216→      sessionStorage.setItem(SESSION_KEY, secret)
+   217→      setRows(j.licenses)
+   218→      setPhase('ready')
+   219→      setPasskey('')
+   220→    } catch (e) {
+   221→      setAuthError(e instanceof Error ? e.message : 'Gagal verifikasi kunci.')
+   222→    } finally {
+   223→      setChecking(false)
+   224→    }
+   225→  }
+   226→
+   227→  // Auto-login dari sessionStorage — cukup sekali per tab (bukan dependency render)
+   228→  useEffect(() => {
+   229→    const saved = sessionStorage.getItem(SESSION_KEY)
+   230→    if (saved) void verifyAndLoad(saved)
+   231→  }, [])
+   232→
+   233→  function handleLogin(e: React.FormEvent) {
+   234→    e.preventDefault()
+   235→    const key = passkey.trim()
+   236→    if (!key) {
+   237→      setAuthError('Masukkan Master Secret Key.')
+   238→      return
+   239→    }
+   240→    void verifyAndLoad(key)
+   241→  }
+   242→
+   243→  function handleLogout() {
+   244→    sessionStorage.removeItem(SESSION_KEY)
+   245→    secretRef.current = null
+   246→    setRows([])
+   247→    setResult(null)
+   248→    setPasskey('')
+   249→    setPhase('login')
+   250→  }
+   251→
+   252→  /** Generate lisensi baru 1-klik. */
+   253→  async function handleGenerate(e: React.FormEvent) {
+   254→    e.preventDefault()
+   255→    const quota = Number(maxVehicles)
+   256→    if (!Number.isInteger(quota) || quota < 1 || quota > 10000) {
+   257→      toast.error('Kuota unit harus angka 1 - 10.000.')
+   258→      return
+   259→    }
+   260→    setGenerating(true)
+   261→    try {
+   262→      const res = await fetch('/api/super-admin/licenses', {
+   263→        method: 'POST',
+   264→        headers: {
+   265→          'Content-Type': 'application/json',
+   266→          'X-Super-Secret': secretRef.current ?? '',
+   267→        },
+   268→        body: JSON.stringify({ planType, maxVehicles: quota }),
+   269→      })
+   270→      if (res.status === 401) {
+   271→        await refetch()
+   272→        return
+   273→      }
+   274→      const j = await res.json()
+   275→      if (!res.ok) throw new Error(j.error || 'Gagal membuat lisensi.')
+   276→      const license = { ...(j.license as SuperLicenseRow), showroom: null, usedUnits: 0, totalUnits: 0 }
+   277→      setResult(license)
+   278→      toast.success(`Lisensi ${license.licenseKey} berhasil dibuat!`)
+   279→      await refetch()
+   280→    } catch (e) {
+   281→      toast.error(e instanceof Error ? e.message : 'Gagal membuat lisensi.')
+   282→    } finally {
+   283→      setGenerating(false)
+   284→    }
+   285→  }
+   286→
+   287→  /** Aksi cepat per baris: extend / suspend / unsuspend. */
+   288→  async function handleAction(row: SuperLicenseRow, action: 'extend' | 'suspend' | 'unsuspend') {
+   289→    setBusyId(`${row.id}-${action}`)
+   290→    try {
+   291→      const res = await fetch('/api/super-admin/licenses', {
+   292→        method: 'PATCH',
+   293→        headers: {
+   294→          'Content-Type': 'application/json',
+   295→          'X-Super-Secret': secretRef.current ?? '',
+   296→        },
+   297→        body: JSON.stringify({ id: row.id, action }),
+   298→      })
+   299→      if (res.status === 401) {
+   300→        await refetch()
+   301→        return
+   302→      }
+   303→      const j = await res.json()
+   304→      if (!res.ok) throw new Error(j.error || 'Aksi gagal.')
+   305→      if (action === 'extend') toast.success(`+30 hari — masa aktif kini ${expiryLabel(row)}`)
+   306→      if (action === 'suspend') toast.success(`${row.licenseKey} dibekukan (suspend).`)
+   307→      if (action === 'unsuspend') toast.success(`${row.licenseKey} dibuka kembali.`)
+   308→      await refetch()
+   309→    } catch (e) {
+   310→      toast.error(e instanceof Error ? e.message : 'Aksi gagal.')
+   311→    } finally {
+   312→      setBusyId(null)
+   313→    }
+   314→  }
+   315→
+   316→  async function copy(text: string, okMsg: string) {
+   317→    const done = await copyToClipboard(text)
+   318→    if (done) toast.success(okMsg)
+   319→    else toast.error('Gagal menyalin. Coba lagi.')
+   320→  }
+   321→
+   322→  const filtered = useMemo(() => {
+   323→    const query = q.trim().toLowerCase()
+   324→    if (!query) return rows
+   325→    return rows.filter((r) =>
+   326→      [r.licenseKey, r.showroom?.name ?? '', r.showroom?.slug ?? '', r.showroom?.ownerPhone ?? '']
+   327→        .join(' ')
+   328→        .toLowerCase()
+   329→        .includes(query),
+   330→    )
+   331→  }, [rows, q])
+   332→
+   333→  const stats = useMemo(() => {
+   334→    let active = 0
+   335→    let problem = 0
+   336→    let showrooms = 0
+   337→    let unitsInStock = 0
+   338→    for (const r of rows) {
+   339→      const st = effectiveStatus(r)
+   340→      if (st === 'active' || st === 'near_expiry') active++
+   341→      else problem++
+   342→      if (r.showroom && r.showroom.isActive) showrooms++
+   343→      unitsInStock += r.usedUnits
+   344→    }
+   345→    return { total: rows.length, active, problem, showrooms, unitsInStock }
+   346→  }, [rows])
+   347→
+   348→  // ============ Layar login Master Secret Key ============
+   349→  if (phase === 'login') {
+   350→    return (
+   351→      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-16">
+   352→        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+   353→          <div className="flex items-center gap-2">
+   354→            <ShieldCheck className="h-6 w-6 text-blue-700" aria-hidden />
+   355→            <h1 className="text-base font-extrabold text-slate-900">OtoStok Super Admin</h1>
+   356→          </div>
+   357→          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+   358→            Panel pengelola platform. Autentikasi memakai Master Secret Key — terpisah dari akun
+   359→            Owner/Admin showroom.
+   360→          </p>
+   361→
+   362→          <form onSubmit={handleLogin} className="mt-5 space-y-3">
+   363→            <div className="relative">
+   364→              <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+   365→              <Input
+   366→                type="password"
+   367→                value={passkey}
+   368→                onChange={(e) => setPasskey(e.target.value)}
+   369→                placeholder="Master Secret Key"
+   370→                className="h-11 pl-9 font-mono"
+   371→                autoComplete="off"
+   372→                aria-label="Master Secret Key"
+   373→              />
+   374→            </div>
+   375→            {authError && <p className="text-xs font-bold text-red-600">{authError}</p>}
+   376→            <Button
+   377→              type="submit"
+   378→              className="h-11 w-full bg-blue-700 text-sm font-extrabold hover:bg-blue-800"
+   379→              disabled={checking}
+   380→            >
+   381→              {checking ? (
+   382→                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />
+   383→              ) : (
+   384→                <LockOpen className="mr-1.5 h-4 w-4" aria-hidden />
+   385→              )}
+   386→              Buka Panel
+   387→            </Button>
+   388→          </form>
+   389→        </div>
+   390→        <p className="mt-4 text-center text-[11px] text-slate-400">
+   391→          Sesi disimpan di sessionStorage per tab — tidak dipakai bersama akun showroom.
+   392→        </p>
+   393→      </div>
+   394→    )
+   395→  }
+   396→
+   397→  // ============ Panel Super Admin ============
+   398→  return (
+   399→    <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+   400→      {/* Bar judul */}
+   401→      <div className="flex flex-wrap items-center gap-3">
+   402→        <ShieldCheck className="h-6 w-6 text-blue-700" aria-hidden />
+   403→        <div className="min-w-0 flex-1">
+   404→          <h1 className="text-lg font-extrabold text-slate-900">OtoStok — Super Admin</h1>
+   405→          <p className="text-xs text-slate-500">
+   406→            Generator lisensi & monitoring seluruh klien platform.
+   407→          </p>
+   408→        </div>
+   409→        <Badge className="bg-slate-900 text-white hover:bg-slate-900">MASTER</Badge>
+   410→        <Button
+   411→          variant="outline"
+   412→          size="sm"
+   413→          className="h-10 border-slate-300 text-xs font-extrabold"
+   414→          onClick={handleLogout}
+   415→        >
+   416→          Keluar
+   417→        </Button>
+   418→      </div>
+   419→
+   420→      {/* Kartu statistik */}
+   421→      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+   422→        <div className="rounded-lg border border-slate-200 bg-white p-4">
+   423→          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+   424→            <Ticket className="h-3.5 w-3.5" aria-hidden /> Total Lisensi
+   425→          </div>
+   426→          <p className="mt-1 text-2xl font-extrabold text-slate-900">{stats.total}</p>
+   427→        </div>
+   428→        <div className="rounded-lg border border-slate-200 bg-white p-4">
+   429→          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+   430→            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" aria-hidden /> Lisensi Aktif
+   431→          </div>
+   432→          <p className="mt-1 text-2xl font-extrabold text-emerald-700">{stats.active}</p>
+   433→        </div>
+   434→        <div className="rounded-lg border border-slate-200 bg-white p-4">
+   435→          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+   436→            <Store className="h-3.5 w-3.5" aria-hidden /> Showroom Aktif
+   437→          </div>
+   438→          <p className="mt-1 text-2xl font-extrabold text-slate-900">{stats.showrooms}</p>
+   439→        </div>
+   440→        <div className="rounded-lg border border-slate-200 bg-white p-4">
+   441→          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+   442→            <CalendarClock className="h-3.5 w-3.5" aria-hidden /> Unit Stok Berjalan
+   443→          </div>
+   444→          <p className="mt-1 text-2xl font-extrabold text-slate-900">{stats.unitsInStock}</p>
+   445→        </div>
+   446→      </div>
+   447→
+   448→      <div className="mt-5 grid gap-4 lg:grid-cols-5">
+   449→        {/* Generator lisensi */}
+   450→        <section className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
+   451→          <h2 className="text-sm font-extrabold text-slate-900">Generator Lisensi</h2>
+   452→          <p className="mt-0.5 text-xs text-slate-500">
+   453→            Buat kode lisensi baru format <span className="font-mono font-bold">OTO-XXXX-XXXX-XXXX</span>.
+   454→          </p>
+   455→          <form onSubmit={handleGenerate} className="mt-4 space-y-3">
+   456→            <div>
+   457→              <label
+   458→                htmlFor="sa-plan"
+   459→                className="mb-1 block text-xs font-bold text-slate-700"
+   460→              >
+   461→                Durasi / Paket
+   462→              </label>
+   463→              <Select value={planType} onValueChange={setPlanType}>
+   464→                <SelectTrigger id="sa-plan" className="h-11 w-full text-sm">
+   465→                  <SelectValue placeholder="Pilih paket" />
+   466→                </SelectTrigger>
+   467→                <SelectContent>
+   468→                  {SUPER_PLANS.map((p) => (
+   469→                    <SelectItem key={p.value} value={p.value}>
+   470→                      {p.label}
+   471→                    </SelectItem>
+   472→                  ))}
+   473→                </SelectContent>
+   474→              </Select>
+   475→            </div>
+   476→            <div>
+   477→              <label htmlFor="sa-quota" className="mb-1 block text-xs font-bold text-slate-700">
+   478→                Batas Kuota Unit
+   479→              </label>
+   480→              <Input
+   481→                id="sa-quota"
+   482→                type="number"
+   483→                min={1}
+   484→                max={10000}
+   485→                value={maxVehicles}
+   486→                onChange={(e) => setMaxVehicles(e.target.value)}
+   487→                className="h-11"
+   488→              />
+   489→            </div>
+   490→            <Button
+   491→              type="submit"
+   492→              className="h-11 w-full bg-blue-700 text-sm font-extrabold hover:bg-blue-800"
+   493→              disabled={generating}
+   494→            >
+   495→              {generating ? (
+   496→                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />
+   497→              ) : (
+   498→                <PlusCircle className="mr-1.5 h-4 w-4" aria-hidden />
+   499→              )}
+   500→              Generate Lisensi
+   501→            </Button>
+   502→          </form>
+   503→
+   504→          {/* Kartu hasil generate */}
+   505→          {result && (
+   506→            <div className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
+   507→              <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+   508→                Lisensi berhasil dibuat
+   509→              </p>
+   510→              <p className="mt-1 break-all font-mono text-lg font-extrabold text-slate-900">
+   511→                {result.licenseKey}
+   512→              </p>
+   513→              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold">
+   514→                <span className="rounded bg-white px-2 py-0.5 text-slate-700 ring-1 ring-slate-200">
+   515→                  {planLabel(result.planType)}
+   516→                </span>
+   517→                <span className="rounded bg-white px-2 py-0.5 text-slate-700 ring-1 ring-slate-200">
+   518→                  Kuota {result.maxVehicles} unit
+   519→                </span>
+   520→                <span className="rounded bg-white px-2 py-0.5 text-slate-700 ring-1 ring-slate-200">
+   521→                  {result.expiresAt ? expiryLabel(result) : 'Lifetime'}
+   522→                </span>
+   523→              </div>
+   524→              <div className="mt-3 grid grid-cols-2 gap-2">
+   525→                <Button
+   526→                  variant="outline"
+   527→                  className="h-10 border-slate-300 bg-white text-xs font-extrabold"
+   528→                  onClick={() => copy(result.licenseKey, 'Kode lisensi disalin.')}
+   529→                >
+   530→                  <Copy className="mr-1 h-3.5 w-3.5" /> Salin Kode
+   531→                </Button>
+   532→                <Button
+   533→                  className="h-10 bg-emerald-700 text-xs font-extrabold hover:bg-emerald-800"
+   534→                  onClick={() =>
+   535→                    copy(buildBuyerWaMessage(result), 'Format WA pembeli disalin.')
+   536→                  }
+   537→                >
+   538→                  <MessageCircle className="mr-1 h-3.5 w-3.5" /> Salin Format WA Pembeli
+   539→                </Button>
+   540→              </div>
+   541→            </div>
+   542→          )}
+   543→        </section>
+   544→
+   545→        {/* Tabel monitoring */}
+   546→        <section className="rounded-lg border border-slate-200 bg-white lg:col-span-3">
+   547→          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 p-4">
+   548→            <h2 className="min-w-0 flex-1 text-sm font-extrabold text-slate-900">
+   549→              Monitoring Klien & Showroom
+   550→            </h2>
+   551→            <Button
+   552→              variant="outline"
+   553→              size="sm"
+   554→              className="h-9 border-slate-300 text-xs font-extrabold"
+   555→              onClick={() => refetch()}
+   556→              disabled={refreshing}
+   557→            >
+   558→              <RefreshCcw
+   559→                className={`mr-1 h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
+   560→                aria-hidden
+   561→              />
+   562→              Muat Ulang
+   563→            </Button>
+   564→          </div>
+   565→          <div className="border-b border-slate-200 px-4 py-3">
+   566→            <div className="relative">
+   567→              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+   568→              <Input
+   569→                value={q}
+   570→                onChange={(e) => setQ(e.target.value)}
+   571→                placeholder="Cari kode lisensi, showroom, slug, atau nomor WA..."
+   572→                className="h-10 pl-9"
+   573→                aria-label="Cari lisensi"
+   574→              />
+   575→            </div>
+   576→          </div>
+   577→
+   578→          {filtered.length === 0 ? (
+   579→            <p className="px-4 py-10 text-center text-sm font-bold text-slate-500">
+   580→              {rows.length === 0 ? 'Belum ada lisensi terdaftar.' : 'Tidak ada hasil yang cocok.'}
+   581→            </p>
+   582→          ) : (
+   583→            <>
+   584→              {/* Tabel desktop */}
+   585→              <div className="hidden max-h-[36rem] overflow-y-auto lg:block">
+   586→                <Table>
+   587→                  <TableHeader className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0]">
+   588→                    <TableRow className="hover:bg-white">
+   589→                      <TableHead className="text-xs">Lisensi</TableHead>
+   590→                      <TableHead className="text-xs">Showroom</TableHead>
+   591→                      <TableHead className="text-xs">Owner WA</TableHead>
+   592→                      <TableHead className="text-xs">Kuota</TableHead>
+   593→                      <TableHead className="text-xs">Masa Aktif</TableHead>
+   594→                      <TableHead className="text-xs">Status</TableHead>
+   595→                      <TableHead className="text-right text-xs">Aksi Cepat</TableHead>
+   596→                    </TableRow>
+   597→                  </TableHeader>
+   598→                  <TableBody>
+   599→                    {filtered.map((r) => (
+   600→                      <LicenseRowActions
+   601→                        key={r.id}
+   602→                        row={r}
+   603→                        busyId={busyId}
+   604→                        onAction={handleAction}
+   605→                        onCopy={copy}
+   606→                        compact={false}
+   607→                      />
+   608→                    ))}
+   609→                  </TableBody>
+   610→                </Table>
+   611→              </div>
+   612→
+   613→              {/* Kartu mobile */}
+   614→              <div className="max-h-[40rem] space-y-3 overflow-y-auto p-4 lg:hidden">
+   615→                {filtered.map((r) => (
+   616→                  <LicenseRowActions
+   617→                    key={r.id}
+   618→                    row={r}
+   619→                    busyId={busyId}
+   620→                    onAction={handleAction}
+   621→                    onCopy={copy}
+   622→                    compact
+   623→                  />
+   624→                ))}
+   625→              </div>
+   626→            </>
+   627→          )}
+   628→        </section>
+   629→      </div>
+   630→    </div>
+   631→  )
+   632→}
+   633→
+   634→/** Satu baris lisensi — mode tabel (desktop) atau kartu (mobile). */
+   635→function LicenseRowActions({
+   636→  row,
+   637→  busyId,
+   638→  onAction,
+   639→  onCopy,
+   640→  compact,
+   641→}: {
+   642→  row: SuperLicenseRow
+   643→  busyId: string | null
+   644→  onAction: (row: SuperLicenseRow, action: 'extend' | 'suspend' | 'unsuspend') => void
+   645→  onCopy: (text: string, okMsg: string) => void
+   646→  compact: boolean
+   647→}) {
+   648→  const st = effectiveStatus(row)
+   649→  const badge = STATUS_BADGE[st]
+   650→  const isSuspended = st === 'suspended'
+   651→  const isLifetime = !row.expiresAt
+   652→  const busy = busyId != null
+   653→  const quotaPct = row.maxVehicles > 0 ? Math.min(100, (row.usedUnits / row.maxVehicles) * 100) : 0
+   654→
+   655→  const licenseCell = (
+   656→    <div>
+   657→      <p className="font-mono text-[13px] font-extrabold tracking-tight text-slate-900">
+   658→        {row.licenseKey}
+   659→      </p>
+   660→      <span className="mt-0.5 inline-block rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+   661→        {planLabel(row.planType)} • {row.maxVehicles} unit
+   662→      </span>
+   663→    </div>
+   664→  )
+   665→
+   666→  const showroomCell = row.showroom ? (
+   667→    <div className="min-w-0">
+   668→      <p className="truncate text-[13px] font-extrabold text-slate-900">{row.showroom.name}</p>
+   669→      <a
+   670→        href={`/s/${row.showroom.slug}`}
+   671→        target="_blank"
+   672→        rel="noreferrer"
+   673→        className="text-[11px] font-bold text-blue-700 underline hover:text-blue-900"
+   674→      >
+   675→        /s/{row.showroom.slug}
+   676→      </a>
+   677→      {!row.showroom.isActive && (
+   678→        <span className="ml-1.5 inline-block rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+   679→          Akses dibekukan
+   680→        </span>
+   681→      )}
+   682→    </div>
+   683→  ) : (
+   684→    <p className="text-xs italic text-slate-400">Belum diaktivasi</p>
+   685→  )
+   686→
+   687→  const waCell = row.showroom ? (
+   688→    <a
+   689→      href={waLink(
+   690→        row.showroom.ownerPhone,
+   691→        `Halo ${row.showroom.name}, dari tim OtoStok. Terkait lisensi ${row.licenseKey}...`,
+   692→      )}
+   693→      target="_blank"
+   694→      rel="noreferrer"
+   695→      className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-700 hover:text-emerald-800"
+   696→      title="Chat owner via WhatsApp"
+   697→    >
+   698→      <MessageCircle className="h-3.5 w-3.5" aria-hidden />
+   699→      {formatPhoneDisplay(row.showroom.ownerPhone)}
+   700→    </a>
+   701→  ) : (
+   702→    <span className="text-xs text-slate-400">—</span>
+   703→  )
+   704→
+   705→  const quotaCell = (
+   706→    <div className="w-24">
+   707→      <p
+   708→        className={`text-xs font-extrabold ${
+   709→          row.usedUnits >= row.maxVehicles ? 'text-red-600' : 'text-slate-900'
+   710→        }`}
+   711→      >
+   712→        {row.usedUnits} / {row.maxVehicles} <span className="font-semibold">unit</span>
+   713→      </p>
+   714→      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+   715→        <div
+   716→          className={`h-full rounded-full ${
+   717→            row.usedUnits >= row.maxVehicles ? 'bg-red-600' : 'bg-blue-700'
+   718→          }`}
+   719→          style={{ width: `${quotaPct}%` }}
+   720→        />
+   721→      </div>
+   722→    </div>
+   723→  )
+   724→
+   725→  const expiryCell = (
+   726→    <div>
+   727→      <p
+   728→        className={`text-xs font-extrabold ${
+   729→          st === 'expired' ? 'text-red-600' : st === 'near_expiry' ? 'text-amber-600' : 'text-slate-900'
+   730→        }`}
+   731→      >
+   732→        {expiryLabel(row)}
+   733→      </p>
+   734→      {st === 'near_expiry' && row.expiresAt && (
+   735→        <p className="text-[10px] font-bold text-amber-600">
+   736→          Sisa {Math.max(1, Math.ceil((new Date(row.expiresAt).getTime() - Date.now()) / DAY_MS))} hari
+   737→        </p>
+   738→      )}
+   739→    </div>
+   740→  )
+   741→
+   742→  const statusCell = (
+   743→    <span
+   744→      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-extrabold ${badge.className}`}
+   745→    >
+   746→      {isSuspended && <Lock className="h-3 w-3" aria-hidden />}
+   747→      {badge.label}
+   748→    </span>
+   749→  )
+   750→
+   751→  const actionCell = (
+   752→    <div className={compact ? 'grid grid-cols-3 gap-1.5' : 'flex items-center justify-end gap-1.5'}>
+   753→      <Button
+   754→        variant="outline"
+   755→        size="sm"
+   756→        className="h-8 border-slate-300 px-2 text-[11px] font-extrabold"
+   757→        disabled={isLifetime || busy}
+   758→        title={isLifetime ? 'Lifetime tidak perlu diperpanjang' : 'Tambah 30 hari masa aktif'}
+   759→        onClick={() => onAction(row, 'extend')}
+   760→      >
+   761→        {busyId === `${row.id}-extend` ? (
+   762→          <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+   763→        ) : (
+   764→          '+30 Hari'
+   765→        )}
+   766→      </Button>
+   767→      {isSuspended ? (
+   768→        <Button
+   769→          variant="outline"
+   770→          size="sm"
+   771→          className="h-8 border-emerald-300 bg-emerald-50 px-2 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100"
+   772→          disabled={busy}
+   773→          title="Buka kunci akses showroom"
+   774→          onClick={() => onAction(row, 'unsuspend')}
+   775→        >
+   776→          {busyId === `${row.id}-unsuspend` ? (
+   777→            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+   778→          ) : (
+   779→            <>
+   780→              <LockOpen className="mr-0.5 h-3 w-3" aria-hidden /> Buka
+   781→            </>
+   782→          )}
+   783→        </Button>
+   784→      ) : (
+   785→        <Button
+   786→          variant="outline"
+   787→          size="sm"
+   788→          className="h-8 border-amber-300 bg-amber-50 px-2 text-[11px] font-extrabold text-amber-700 hover:bg-amber-100"
+   789→          disabled={busy}
+   790→          title="Bekukan akses showroom (mis. tunggakan pembayaran)"
+   791→          onClick={() => onAction(row, 'suspend')}
+   792→        >
+   793→          {busyId === `${row.id}-suspend` ? (
+   794→            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+   795→          ) : (
+   796→            <>
+   797→              <Lock className="mr-0.5 h-3 w-3" aria-hidden /> Suspend
+   798→            </>
+   799→          )}
+   800→        </Button>
+   801→      )}
+   802→      <Button
+   803→        variant="ghost"
+   804→        size="sm"
+   805→        className="h-8 px-2 text-[11px] font-extrabold text-slate-600"
+   806→        disabled={busy}
+   807→        title="Salin ringkasan lisensi"
+   808→        onClick={() => onCopy(buildRowSummary(row), 'Ringkasan lisensi disalin.')}
+   809→      >
+   810→        <ClipboardCopy className="h-3.5 w-3.5" aria-hidden />
+   811→        <span className="sr-only">Salin info lisensi {row.licenseKey}</span>
+   812→      </Button>
+   813→    </div>
+   814→  )
+   815→
+   816→  if (!compact) {
+   817→    return (
+   818→      <TableRow className={isSuspended ? 'bg-red-50/40' : undefined}>
+   819→        <TableCell>{licenseCell}</TableCell>
+   820→        <TableCell>{showroomCell}</TableCell>
+   821→        <TableCell>{waCell}</TableCell>
+   822→        <TableCell>{quotaCell}</TableCell>
+   823→        <TableCell>{expiryCell}</TableCell>
+   824→        <TableCell>{statusCell}</TableCell>
+   825→        <TableCell className="text-right">{actionCell}</TableCell>
+   826→      </TableRow>
+   827→    )
+   828→  }
+   829→
+   830→  return (
+   831→    <div
+   832→      className={`rounded-lg border p-3 ${
+   833→        isSuspended ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-white'
+   834→      }`}
+   835→    >
+   836→      <div className="flex items-start justify-between gap-2">
+   837→        {licenseCell}
+   838→        {statusCell}
+   839→      </div>
+   840→      <div className="mt-2.5 space-y-2 border-t border-slate-200 pt-2.5">
+   841→        <div className="flex items-center justify-between gap-2">
+   842→          <span className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+   843→            <Building2 className="h-3.5 w-3.5" aria-hidden /> Showroom
+   844→          </span>
+   845→          {showroomCell}
+   846→        </div>
+   847→        <div className="flex items-center justify-between gap-2">
+   848→          <span className="text-[11px] font-bold text-slate-500">Owner WA</span>
+   849→          {waCell}
+   850→        </div>
+   851→        <div className="flex items-center justify-between gap-2">
+   852→          <span className="text-[11px] font-bold text-slate-500">Kuota</span>
+   853→          {quotaCell}
+   854→        </div>
+   855→        <div className="flex items-center justify-between gap-2">
+   856→          <span className="text-[11px] font-bold text-slate-500">Masa Aktif</span>
+   857→          {expiryCell}
+   858→        </div>
+   859→      </div>
+   860→      <div className="mt-2.5 border-t border-slate-200 pt-2.5">{actionCell}</div>
+   861→    </div>
+   862→  )
+   863→}
+   864→

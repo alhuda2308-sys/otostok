@@ -206,3 +206,19 @@ Stage Summary:
 - Secret .env TIDAK ikut ter-push; template .env.example tersedia untuk clone baru
 - Token GitHub tersimpan di ~/.config/gh/hosts.yml (di luar folder proyek, tidak masuk git) untuk push berikutnya
 - Identitas commit terhubung ke akun GitHub user (noreply email)
+
+---
+Task ID: super-admin-login-debug
+Agent: main (Z.ai Code)
+Task: Diagnosa laporan user gagal verifikasi kunci di /super-admin
+
+Work Log:
+- Baca lib/super-auth.ts, api/super-admin/licenses/route.ts, super-admin-client.tsx — logika auth benar (header X-Super-Secret, timingSafeEqual dengan cek panjang)
+- Tes API via curl: kunci benar → 200 dgn data, kunci salah → 401 (server sehat, env termuat)
+- dev.log menunjukkan percobaan user berakhir dengan 401 → kunci yang diketik salah
+- Reproduksi di agent-browser: kunci salah → "Master Secret Key salah." ; kunci benar → dashboard terbuka penuh (5 lisensi, generator, monitoring)
+- Tidak ada perubahan kode — murni kesalahan input kunci oleh user
+
+Stage Summary:
+- Modul Super Admin berfungsi normal; Master Key aktif: otostok_sa_c346a161b047c5e756f58bbe (dari .env)
+- Solusi untuk user: salin-tempel kunci persis tanpa spasi
