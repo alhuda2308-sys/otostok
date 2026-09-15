@@ -261,3 +261,16 @@ Stage Summary:
 - Login /super-admin berfungsi penuh lewat preview; akun demo: owner/demo1234, budi/budi1234
 - Data demo ter-restorasi (4 lisensi, Showroom Jaya 11 unit berfoto, cabang, marketing, taxonomy)
 - PELAJARAN: restart sandbox menghapus .env (baris SUPER_ADMIN), DB, dan folder untracked — selalu cek .env & seed setelah restart container
+
+---
+Task ID: sandbox-restart-recovery-2
+Agent: main (Z.ai Code)
+Task: Pulihkan push GitHub pasca-restart (gh config & binary terhapus, riwayat fork)
+
+Work Log:
+- Push gagal: ~/.config/gh/hosts.yml & ~/.local/bin/gh dihapus restart sandbox → reinstall gh v2.101.0 + restore hosts.yml + setup-git
+- Push kedua ditolak non-fast-forward: remote punya duplikat commit worklog (2bd5a6a) vs lokal (1bff4d9) akibat restart
+- git rebase origin/main → push sukses; commit seed fallback & recovery worklog masuk semua
+
+Stage Summary:
+- GitHub sinkron; dev server hidup; super-admin API 200 via gateway
