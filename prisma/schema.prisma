@@ -1,0 +1,185 @@
+// OtoStok — Skema database manajemen stok showroom motor bekas
+// Skema ini portable: untuk Supabase/Postgres cukup ganti provider ke "postgresql"
+// dan url ke connection string Supabase. Lihat juga supabase/schema.sql
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Lisensi aktivasi software (distribusi mandiri)
+model License {
+  id          String    @id @default(cuid())
+  licenseKey  String    @unique @map("license_key") // format MTR-XXXX-XXXX
+  planType    String    @map("plan_type") // trial | monthly | lifetime
+  maxVehicles Int       @default(10) @map("max_vehicles")
+  status      String    @default("active") // active | expired
+  expiresAt   DateTime? @map("expires_at") // null = lifetime
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  showrooms Showroom[]
+
+  @@map("licenses")
+}
+
+// Showroom terikat 1:1 ke lisensi
+model Showroom {
+  id         String   @id @default(cuid())
+  licenseId  String   @unique @map("license_id")
+  name       String
+  slug       String   @unique // contoh: showroom-jaya
+  ownerPhone String   @map("owner_phone")
+  address    String
+  logoUrl    String?  @map("logo_url") // logo showroom (tampil di katalog publik)
+  headerUrl  String?  @map("header_url") // foto header/banner katalog publik
+  mapsUrl    String?  @map("maps_url") // link Google Maps lokasi showroom
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  license    License       @relation(fields: [licenseId], references: [id])
+  vehicles   Vehicle[]
+  staff      StaffAccount[]
+  taxonomies Taxonomy[]
+  branches   Branch[]
+  marketings Marketing[]
+
+  @@map("showrooms")
+}
+
+// Akun login dashboard (owner = kendali penuh, admin = staf terbatas)
+model StaffAccount {
+  id           String   @id @default(cuid())
+  showroomId   String   @map("showroom_id")
+  name         String
+  username     String // unik per showroom
+  passwordHash String   @map("password_hash") // scrypt: salt:hex
+  role         String   @default("admin") // owner | admin
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  showroom Showroom @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+
+  @@unique([showroomId, username])
+  @@map("staff_accounts")
+}
+
+// Cabang showroom (lokasi unit dinamis).
+// Tanpa cabang = showroom hanya punya 1 lokasi (lokasi utama) —
+// UI otomatis menyembunyikan dropdown & filter lokasi.
+model Branch {
+  id         String   @id @default(cuid())
+  showroomId String   @map("showroom_id")
+  name       String // cth: Cabang Bekasi
+  address    String
+  mapsUrl    String?  @map("maps_url") // link Google Maps cabang
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  showroom Showroom @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+  vehicles Vehicle[]
+
+  @@unique([showroomId, name])
+  @@map("branches")
+}
+
+// Kategori & merek custom per showroom (tidak di-hardcode)
+model Taxonomy {
+  id         String   @id @default(cuid())
+  showroomId String   @map("showroom_id")
+  kind       String // category | brand
+  name       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  showroom Showroom @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+
+  @@unique([showroomId, kind, name])
+  @@map("taxonomies")
+}
+
+// Unit motor bekas. base_price SENSITIF (hanya owner).
+// photos disimpan sebagai JSON array of string (portable SQLite/Postgres).
+model Vehicle {
+  id               String    @id @default(cuid())
+  showroomId       String    @map("showroom_id")
+  brand            String // Honda, Yamaha, Suzuki, dst (dari taxonomy showroom)
+  model            String // Beat 110 CBS, NMAX 155, dst
+  category         String? // Matic, Bebek, Sport, dst (dari taxonomy showroom)
+  year             Int
+  licensePlate     String    @map("license_plate")
+  color            String?
+  odometer         Int? // KM
+  taxStatus        String?   @map("tax_status") // cth: "Hidup s/d 03/2026"
+  documentStatus   String?   @map("document_status") // cth: "STNK & BPKB Lengkap"
+  basePrice        Int?      @map("base_price") // harga modal — TIDAK PERNAH tampil di katalog publik
+  sellingPrice     Int?      @map("selling_price") // harga jual showroom
+  commissionAmount Int?      @map("commission_amount") // komisi marketing nominal fix (Rp)
+  status           String    @default("available") // available | hold | sold
+  photos           String    @default("[]") // JSON array of URL string
+  notes            String?
+  // --- Mutasi unit masuk ---
+  purchasedAt      DateTime? @map("purchased_at") // tanggal unit masuk (default: createdAt)
+  arrivalNotes     String?   @map("arrival_notes") // catatan kondisi fisik saat datang
+  arrivalPhotos    String?   @default("[]") @map("arrival_photos") // JSON array foto kondisi saat datang
+  // --- Mutasi unit keluar / penjualan ---
+  soldAt           DateTime? @map("sold_at") // tanggal laku
+  soldPrice        Int?      @map("sold_price") // harga deal akhir
+  soldBy           String?   @map("sold_by") // nama marketing yang tembus
+  handoverPhoto    String?   @map("handover_photo") // foto bukti serah terima (opsional)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  branchId         String?   @map("branch_id") // null = lokasi utama showroom
+
+  showroom Showroom  @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+  branch   Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  bookings Booking[]
+
+  @@index([showroomId, status])
+  @@index([branchId])
+  @@map("vehicles")
+}
+
+// Rekanan marketing terdaftar (Whitelist Nomor WhatsApp).
+// Nomor yang ada di sini satu-satunya yang bisa membuka katalog publik
+// (bila showroom sudah mendaftarkan minimal 1 rekanan).
+model Marketing {
+  id          String   @id @default(cuid())
+  showroomId  String   @map("showroom_id")
+  fullName    String   @map("full_name")
+  phoneNumber String   @map("phone_number") // format lokal 08xxx, unik per showroom
+  addressCity String   @map("address_city") // domisili / kota asal
+  ktpPhotoUrl String?  @map("ktp_photo_url") // opsional, dilayani via API aman (bukan file publik)
+  notes       String? // catatan khusus owner
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  showroom Showroom @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@unique([showroomId, phoneNumber])
+  @@map("marketings")
+}
+
+// Tahanan unit oleh marketing (hold 2 jam).
+// marketingName/phone tetap disimpan denormalisasi agar riwayat tidak hilang
+// saat data rekanan diedit/dihapus.
+model Booking {
+  id             String   @id @default(cuid())
+  vehicleId      String   @map("vehicle_id")
+  marketingId    String?  @map("marketing_id") // null = hold manual tanpa akun rekanan
+  marketingName  String   @map("marketing_name")
+  marketingPhone String   @map("marketing_phone")
+  status         String   @default("hold") // hold | confirmed | expired
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  marketing Marketing? @relation(fields: [marketingId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId, status])
+  @@index([marketingId])
+  @@map("bookings")
+}

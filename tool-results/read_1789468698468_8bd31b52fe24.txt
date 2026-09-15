@@ -1,0 +1,695 @@
+     1→'use client'
+     2→
+     3→import { useCallback, useEffect, useMemo, useState } from 'react'
+     4→import { toast } from 'sonner'
+     5→import {
+     6→  Camera,
+     7→  ChevronLeft,
+     8→  ChevronRight,
+     9→  ClipboardCopy,
+    10→  ExternalLink,
+    11→  Lock,
+    12→  MapPin,
+    13→  MessageCircle,
+    14→  Search,
+    15→} from 'lucide-react'
+    16→import { Countdown } from '@/components/countdown'
+    17→import { HoldDialog } from '@/components/hold-dialog'
+    18→import { StatusBadge } from '@/components/status-badge'
+    19→import { VehiclePhoto } from '@/components/vehicle-photo'
+    20→import { Button } from '@/components/ui/button'
+    21→import {
+    22→  Dialog,
+    23→  DialogContent,
+    24→  DialogHeader,
+    25→  DialogTitle,
+    26→} from '@/components/ui/dialog'
+    27→import { Input } from '@/components/ui/input'
+    28→import {
+    29→  buildAdText,
+    30→  copyToClipboard,
+    31→  formatDateTimeID,
+    32→  formatKm,
+    33→  formatRupiah,
+    34→  isTaxAlive,
+    35→  waLink,
+    36→} from '@/lib/format'
+    37→import type { PublicCatalogResponse, PublicVehicle, TaxonomyResponse } from '@/lib/types'
+    38→
+    39→export type StatusFilter = 'all' | 'available' | 'hold'
+    40→
+    41→export function CatalogClient({ slug }: { slug: string }) {
+    42→  const [data, setData] = useState<PublicCatalogResponse | null>(null)
+    43→  const [loading, setLoading] = useState(true)
+    44→  const [error, setError] = useState<string | null>(null)
+    45→  const [notFound, setNotFound] = useState(false)
+    46→
+    47→  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+    48→  const [brandFilter, setBrandFilter] = useState<string>('all')
+    49→  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+    50→  const [branchFilter, setBranchFilter] = useState<string>('all') // all | main | branchId
+    51→  const [q, setQ] = useState('')
+    52→  const [holdTarget, setHoldTarget] = useState<PublicVehicle | null>(null)
+    53→  const [gallery, setGallery] = useState<{ vehicle: PublicVehicle; index: number } | null>(null)
+    54→  const [taxonomy, setTaxonomy] = useState<TaxonomyResponse | null>(null)
+    55→
+    56→  const refetch = useCallback(
+    57→    async (silent = false) => {
+    58→      if (!silent) setLoading(true)
+    59→      try {
+    60→        const res = await fetch(`/api/showrooms/${slug}/vehicles`, { cache: 'no-store' })
+    61→        if (res.status === 404) {
+    62→          setNotFound(true)
+    63→          return
+    64→        }
+    65→        if (!res.ok) {
+    66→          const j = await res.json().catch(() => ({}))
+    67→          throw new Error(j.error || 'Gagal memuat katalog.')
+    68→        }
+    69→        setData(await res.json())
+    70→        setError(null)
+    71→      } catch (e) {
+    72→        if (!silent) setError(e instanceof Error ? e.message : 'Gagal memuat katalog.')
+    73→      } finally {
+    74→        if (!silent) setLoading(false)
+    75→      }
+    76→    },
+    77→    [slug],
+    78→  )
+    79→
+    80→  useEffect(() => {
+    81→    refetch()
+    82→  }, [refetch])
+    83→
+    84→  // Filter kategori & merek dari konfigurasi showroom (bisa ditambah owner)
+    85→  useEffect(() => {
+    86→    fetch(`/api/showrooms/${slug}/taxonomy`, { cache: 'no-store' })
+    87→      .then((r) => (r.ok ? r.json() : null))
+    88→      .then((j) => j && setTaxonomy(j))
+    89→      .catch(() => {})
+    90→  }, [slug])
+    91→
+    92→  // Auto-refresh: tahanan kedaluwarsa harus kembali Ready tanpa manual refresh
+    93→  useEffect(() => {
+    94→    const iv = setInterval(() => refetch(true), 30000)
+    95→    const onVis = () => {
+    96→      if (document.visibilityState === 'visible') refetch(true)
+    97→    }
+    98→    document.addEventListener('visibilitychange', onVis)
+    99→    return () => {
+   100→      clearInterval(iv)
+   101→      document.removeEventListener('visibilitychange', onVis)
+   102→    }
+   103→  }, [refetch])
+   104→
+   105→  const brands = useMemo(() => {
+   106→    // Gabung taxonomy (urutan owner) + nilai faktual di stok (antisipasi data lama)
+   107→    const inStock = [...new Set((data?.vehicles ?? []).map((v) => v.brand))].sort()
+   108→    const all = [...new Set([...(taxonomy?.brands ?? []), ...inStock])]
+   109→    return all
+   110→  }, [data, taxonomy])
+   111→
+   112→  const categories = useMemo(() => {
+   113→    const inStock = [
+   114→      ...new Set((data?.vehicles ?? []).map((v) => v.category).filter((c): c is string => !!c)),
+   115→    ].sort()
+   116→    return [...new Set([...(taxonomy?.categories ?? []), ...inStock])]
+   117→  }, [data, taxonomy])
+   118→
+   119→  // Cabang aktif — UI lokasi (badge, filter, Maps) otomatis hilang bila kosong
+   120→  const branches = data?.branches ?? []
+   121→  const hasBranches = branches.length > 0
+   122→
+   123→  const filtered = useMemo(() => {
+   124→    if (!data) return []
+   125→    const query = q.trim().toLowerCase()
+   126→    return data.vehicles.filter((v) => {
+   127→      if (statusFilter === 'available' && v.status !== 'available') return false
+   128→      if (statusFilter === 'hold' && v.status !== 'hold') return false
+   129→      if (brandFilter !== 'all' && v.brand !== brandFilter) return false
+   130→      if (categoryFilter !== 'all' && v.category !== categoryFilter) return false
+   131→      if (branchFilter === 'main' && v.branch) return false
+   132→      if (branchFilter !== 'all' && branchFilter !== 'main' && v.branch?.id !== branchFilter)
+   133→        return false
+   134→      if (!query) return true
+   135→      return [v.brand, v.model, v.licensePlate, String(v.year)]
+   136→        .join(' ')
+   137→        .toLowerCase()
+   138→        .includes(query)
+   139→    })
+   140→  }, [data, statusFilter, brandFilter, categoryFilter, branchFilter, q])
+   141→
+   142→  async function handleCopy(v: PublicVehicle) {
+   143→    if (!data) return
+   144→    const ok = await copyToClipboard(buildAdText(v, data.showroom))
+   145→    if (ok) toast.success('Iklan disalin! Tinggal paste ke WhatsApp Status / Marketplace.')
+   146→    else toast.error('Gagal menyalin. Coba lagi.')
+   147→  }
+   148→
+   149→  if (notFound) {
+   150→    return (
+   151→      <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-16 text-center">
+   152→        <Camera className="h-10 w-10 text-slate-300" aria-hidden />
+   153→        <h1 className="mt-3 text-lg font-extrabold text-slate-900">Katalog tidak ditemukan</h1>
+   154→        <p className="mt-1 text-sm text-slate-500">
+   155→          Katalog dengan alamat <code className="font-bold">/s/{slug}</code> tidak terdaftar
+   156→          atau sudah dinonaktifkan.
+   157→        </p>
+   158→      </div>
+   159→    )
+   160→  }
+   161→
+   162→  const showroom = data?.showroom
+   163→
+   164→  return (
+   165→    <>
+   166→      {/* Header katalog */}
+   167→      <header className="border-b border-slate-200 bg-white">
+   168→        <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-4">
+   169→          {showroom?.logoUrl && (
+   170→            <img
+   171→              src={showroom.logoUrl}
+   172→              alt={`Logo ${showroom.name}`}
+   173→              className="h-10 w-10 shrink-0 rounded-md object-cover ring-1 ring-slate-200"
+   174→            />
+   175→          )}
+   176→          <div className="min-w-0 flex-1">
+   177→            <h1 className="truncate text-sm font-extrabold text-slate-900">
+   178→              {showroom?.name ?? 'Memuat katalog...'}
+   179→            </h1>
+   180→            <p className="truncate text-xs text-slate-500">{showroom?.address ?? '\u00A0'}</p>
+   181→          </div>
+   182→          {showroom?.mapsUrl && (
+   183→            <a
+   184→              href={showroom.mapsUrl}
+   185→              target="_blank"
+   186→              rel="noreferrer"
+   187→              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50"
+   188→              title="Buka lokasi di Google Maps"
+   189→            >
+   190→              <MapPin className="h-4 w-4" aria-hidden />
+   191→              <span className="hidden sm:inline">Maps</span>
+   192→            </a>
+   193→          )}
+   194→          {showroom && (
+   195→            <a
+   196→              href={waLink(
+   197→                showroom.ownerPhone,
+   198→                `Halo ${showroom.name}, saya lihat katalog OtoStok Anda. Ada unit yang menarik.`,
+   199→              )}
+   200→              target="_blank"
+   201→              rel="noreferrer"
+   202→              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-extrabold text-white hover:bg-emerald-800"
+   203→            >
+   204→              <MessageCircle className="h-4 w-4" aria-hidden />
+   205→              <span className="hidden sm:inline">Chat Showroom</span>
+   206→            </a>
+   207→          )}
+   208→        </div>
+   209→        {/* Foto header katalog (diatur owner di Pengaturan Showroom) */}
+   210→        {showroom?.headerUrl && (
+   211→          <div className="mx-auto max-h-44 w-full max-w-5xl overflow-hidden sm:max-h-56">
+   212→            <img
+   213→              src={showroom.headerUrl}
+   214→              alt={`Foto header ${showroom.name}`}
+   215→              className="h-44 w-full object-cover sm:h-56"
+   216→            />
+   217→          </div>
+   218→        )}
+   219→      </header>
+   220→
+   221→      {/* Filter */}
+   222→      <div className="border-b border-slate-200 bg-white">
+   223→        <div className="mx-auto w-full max-w-5xl space-y-2 px-4 py-3">
+   224→          <div className="flex items-center gap-2">
+   225→            <div className="relative flex-1">
+   226→              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+   227→              <Input
+   228→                value={q}
+   229→                onChange={(e) => setQ(e.target.value)}
+   230→                placeholder="Cari model atau plat nomor..."
+   231→                className="h-10 pl-9"
+   232→                aria-label="Cari unit di katalog"
+   233→              />
+   234→            </div>
+   235→            {data && (
+   236→              <span className="hidden shrink-0 text-[11px] text-slate-400 sm:block">
+   237→                Diperbarui {formatDateTimeID(data.fetchedAt)}
+   238→              </span>
+   239→            )}
+   240→          </div>
+   241→
+   242→          <div className="flex flex-wrap items-center gap-2">
+   243→            <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+   244→              <button
+   245→                type="button"
+   246→                onClick={() => setStatusFilter('all')}
+   247→                aria-pressed={statusFilter === 'all'}
+   248→                className={`h-9 rounded-md px-3 text-xs font-bold ${
+   249→                  statusFilter === 'all'
+   250→                    ? 'bg-slate-900 text-white'
+   251→                    : 'text-slate-600 hover:bg-slate-100'
+   252→                }`}
+   253→              >
+   254→                Semua{data ? ` (${data.vehicles.length})` : ''}
+   255→              </button>
+   256→              <button
+   257→                type="button"
+   258→                onClick={() => setStatusFilter('available')}
+   259→                aria-pressed={statusFilter === 'available'}
+   260→                className={`h-9 rounded-md px-3 text-xs font-bold ${
+   261→                  statusFilter === 'available'
+   262→                    ? 'bg-emerald-600 text-white'
+   263→                    : 'text-slate-600 hover:bg-slate-100'
+   264→                }`}
+   265→              >
+   266→                Ready{data ? ` (${data.counts.available})` : ''}
+   267→              </button>
+   268→              <button
+   269→                type="button"
+   270→                onClick={() => setStatusFilter('hold')}
+   271→                aria-pressed={statusFilter === 'hold'}
+   272→                className={`h-9 rounded-md px-3 text-xs font-bold ${
+   273→                  statusFilter === 'hold'
+   274→                    ? 'bg-amber-500 text-white'
+   275→                    : 'text-slate-600 hover:bg-slate-100'
+   276→                }`}
+   277→              >
+   278→                Ditahan{data ? ` (${data.counts.hold})` : ''}
+   279→              </button>
+   280→            </div>
+   281→          </div>
+   282→
+   283→          {/* Chip kategori */}
+   284→          {categories.length > 0 && (
+   285→            <div className="scrollbar-thin flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Filter kategori">
+   286→              <button
+   287→                type="button"
+   288→                onClick={() => setCategoryFilter('all')}
+   289→                className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${
+   290→                  categoryFilter === 'all'
+   291→                    ? 'border-blue-700 bg-blue-700 text-white'
+   292→                    : 'border-slate-300 bg-white text-slate-600'
+   293→                }`}
+   294→              >
+   295→                Semua Kategori
+   296→              </button>
+   297→              {categories.map((c) => (
+   298→                <button
+   299→                  key={c}
+   300→                  type="button"
+   301→                  onClick={() => setCategoryFilter(c)}
+   302→                  className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${
+   303→                    categoryFilter === c
+   304→                      ? 'border-blue-700 bg-blue-700 text-white'
+   305→                      : 'border-slate-300 bg-white text-slate-600'
+   306→                  }`}
+   307→                >
+   308→                  {c}
+   309→                </button>
+   310→              ))}
+   311→            </div>
+   312→          )}
+   313→
+   314→          {brands.length > 1 && (
+   315→            <div className="scrollbar-thin flex gap-1.5 overflow-x-auto pb-1">
+   316→              <button
+   317→                type="button"
+   318→                onClick={() => setBrandFilter('all')}
+   319→                className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${
+   320→                  brandFilter === 'all'
+   321→                    ? 'border-slate-900 bg-slate-900 text-white'
+   322→                    : 'border-slate-300 bg-white text-slate-600'
+   323→                }`}
+   324→              >
+   325→                Semua Merek
+   326→              </button>
+   327→              {brands.map((b) => (
+   328→                <button
+   329→                  key={b}
+   330→                  type="button"
+   331→                  onClick={() => setBrandFilter(b)}
+   332→                  className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${
+   333→                    brandFilter === b
+   334→                      ? 'border-slate-900 bg-slate-900 text-white'
+   335→                      : 'border-slate-300 bg-white text-slate-600'
+   336→                  }`}
+   337→                >
+   338→                  {b}
+   339→                </button>
+   340→              ))}
+   341→            </div>
+   342→          )}
+   343→
+   344→          {/* Chip lokasi cabang — hanya tampil bila showroom punya cabang */}
+   345→          {hasBranches && (
+   346→            <div
+   347→              className="scrollbar-thin flex gap-1.5 overflow-x-auto pb-1"
+   348→              role="group"
+   349→              aria-label="Filter lokasi cabang"
+   350→            >
+   351→              <button
+   352→                type="button"
+   353→                onClick={() => setBranchFilter('all')}
+   354→                className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${
+   355→                  branchFilter === 'all'
+   356→                    ? 'border-emerald-700 bg-emerald-700 text-white'
+   357→                    : 'border-slate-300 bg-white text-slate-600'
+   358→                }`}
+   359→              >
+   360→                Semua Lokasi
+   361→              </button>
+   362→              <button
+   363→                type="button"
+   364→                onClick={() => setBranchFilter('main')}
+   365→                className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${
+   366→                  branchFilter === 'main'
+   367→                    ? 'border-emerald-700 bg-emerald-700 text-white'
+   368→                    : 'border-slate-300 bg-white text-slate-600'
+   369→                }`}
+   370→              >
+   371→                Lokasi Utama
+   372→              </button>
+   373→              {branches.map((b) => (
+   374→                <button
+   375→                  key={b.id}
+   376→                  type="button"
+   377→                  onClick={() => setBranchFilter(b.id)}
+   378→                  className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${
+   379→                    branchFilter === b.id
+   380→                      ? 'border-emerald-700 bg-emerald-700 text-white'
+   381→                      : 'border-slate-300 bg-white text-slate-600'
+   382→                  }`}
+   383→                >
+   384→                  {b.name}
+   385→                </button>
+   386→              ))}
+   387→            </div>
+   388→          )}
+   389→        </div>
+   390→      </div>
+   391→
+   392→      {/* Daftar unit */}
+   393→      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-4">
+   394→        {loading && (
+   395→          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+   396→            {[0, 1, 2, 3, 4, 5].map((i) => (
+   397→              <div
+   398→                key={i}
+   399→                className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+   400→              >
+   401→                <div className="aspect-[4/3] animate-pulse bg-slate-200" />
+   402→                <div className="space-y-2 p-3">
+   403→                  <div className="h-4 w-3/4 animate-pulse rounded bg-slate-200" />
+   404→                  <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200" />
+   405→                  <div className="h-6 w-2/3 animate-pulse rounded bg-slate-200" />
+   406→                </div>
+   407→              </div>
+   408→            ))}
+   409→          </div>
+   410→        )}
+   411→
+   412→        {error && !loading && (
+   413→          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
+   414→            <p className="text-sm font-bold text-red-800">{error}</p>
+   415→            <Button
+   416→              variant="outline"
+   417→              className="mt-3 h-10 border-red-300 text-xs font-bold"
+   418→              onClick={() => refetch()}
+   419→            >
+   420→              Coba Lagi
+   421→            </Button>
+   422→          </div>
+   423→        )}
+   424→
+   425→        {data && !loading && filtered.length === 0 && (
+   426→          <div className="flex flex-col items-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
+   427→            <Search className="h-8 w-8 text-slate-300" aria-hidden />
+   428→            <p className="mt-2 text-sm font-bold text-slate-700">
+   429→              {data.vehicles.length === 0
+   430→                ? 'Belum ada unit di katalog ini.'
+   431→                : 'Tidak ada unit yang cocok dengan filter.'}
+   432→            </p>
+   433→          </div>
+   434→        )}
+   435→
+   436→        {data && !loading && filtered.length > 0 && (
+   437→          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+   438→            {filtered.map((v) => (
+   439→              <CatalogCard
+   440→                key={v.id}
+   441→                v={v}
+   442→                showLocation={hasBranches}
+   443→                fallbackLocName={showroom?.name ?? ''}
+   444→                fallbackLocMaps={showroom?.mapsUrl ?? null}
+   445→                onCopy={() => handleCopy(v)}
+   446→                onHold={() => setHoldTarget(v)}
+   447→                onOpenGallery={(i) => setGallery({ vehicle: v, index: i })}
+   448→                onHoldExpired={() => refetch(true)}
+   449→              />
+   450→            ))}
+   451→          </div>
+   452→        )}
+   453→      </div>
+   454→
+   455→      {/* Dialog hold */}
+   456→      <HoldDialog
+   457→        vehicle={holdTarget}
+   458→        open={holdTarget != null}
+   459→        onOpenChange={(o) => !o && setHoldTarget(null)}
+   460→        onSuccess={() => refetch(true)}
+   461→      />
+   462→
+   463→      {/* Dialog galeri foto */}
+   464→      <Dialog open={gallery != null} onOpenChange={(o) => !o && setGallery(null)}>
+   465→        <DialogContent className="max-w-xl p-3 sm:p-4">
+   466→          <DialogHeader className="sr-only">
+   467→            <DialogTitle>Galeri foto unit</DialogTitle>
+   468→          </DialogHeader>
+   469→          {gallery && (
+   470→            <div className="space-y-2">
+   471→              <div className="relative overflow-hidden rounded-md bg-slate-100">
+   472→                <VehiclePhoto
+   473→                  src={gallery.vehicle.photos[gallery.index]}
+   474→                  alt={`Foto ${gallery.index + 1} ${gallery.vehicle.brand} ${gallery.vehicle.model}`}
+   475→                  className="aspect-[4/3] w-full object-cover"
+   476→                />
+   477→                {gallery.vehicle.photos.length > 1 && (
+   478→                  <>
+   479→                    <button
+   480→                      type="button"
+   481→                      aria-label="Foto sebelumnya"
+   482→                      onClick={() =>
+   483→                        setGallery((g) =>
+   484→                          g
+   485→                            ? {
+   486→                                ...g,
+   487→                                index:
+   488→                                  (g.index - 1 + g.vehicle.photos.length) %
+   489→                                  g.vehicle.photos.length,
+   490→                              }
+   491→                            : g,
+   492→                        )
+   493→                      }
+   494→                      className="absolute left-2 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white p-2 shadow"
+   495→                    >
+   496→                      <ChevronLeft className="h-4 w-4" />
+   497→                    </button>
+   498→                    <button
+   499→                      type="button"
+   500→                      aria-label="Foto berikutnya"
+   501→                      onClick={() =>
+   502→                        setGallery((g) =>
+   503→                          g ? { ...g, index: (g.index + 1) % g.vehicle.photos.length } : g,
+   504→                        )
+   505→                      }
+   506→                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white p-2 shadow"
+   507→                    >
+   508→                      <ChevronRight className="h-4 w-4" />
+   509→                    </button>
+   510→                    <span className="absolute bottom-2 right-2 rounded bg-slate-900/85 px-2 py-0.5 text-xs font-bold text-white">
+   511→                      {gallery.index + 1}/{gallery.vehicle.photos.length}
+   512→                    </span>
+   513→                  </>
+   514→                )}
+   515→              </div>
+   516→              <p className="text-sm font-extrabold text-slate-900">
+   517→                {gallery.vehicle.brand} {gallery.vehicle.model}{' '}
+   518→                <span className="text-xs font-semibold text-slate-500">
+   519→                  {gallery.vehicle.year} • {gallery.vehicle.licensePlate}
+   520→                </span>
+   521→              </p>
+   522→              {gallery.vehicle.notes && (
+   523→                <p className="text-xs leading-relaxed text-slate-600">{gallery.vehicle.notes}</p>
+   524→              )}
+   525→            </div>
+   526→          )}
+   527→        </DialogContent>
+   528→      </Dialog>
+   529→    </>
+   530→  )
+   531→}
+   532→
+   533→function CatalogCard({
+   534→  v,
+   535→  showLocation,
+   536→  fallbackLocName,
+   537→  fallbackLocMaps,
+   538→  onCopy,
+   539→  onHold,
+   540→  onOpenGallery,
+   541→  onHoldExpired,
+   542→}: {
+   543→  v: PublicVehicle
+   544→  /** True hanya bila showroom punya cabang (multi-lokasi). */
+   545→  showLocation: boolean
+   546→  fallbackLocName: string
+   547→  fallbackLocMaps: string | null
+   548→  onCopy: () => void
+   549→  onHold: () => void
+   550→  onOpenGallery: (index: number) => void
+   551→  onHoldExpired: () => void
+   552→}) {
+   553→  const taxAlive = isTaxAlive(v.taxStatus)
+   554→  const isSold = v.status === 'sold'
+   555→  const isHeld = v.status === 'hold'
+   556→  const locName = v.branch?.name || fallbackLocName
+   557→  const locMaps = v.branch?.mapsUrl ?? fallbackLocMaps
+   558→
+   559→  return (
+   560→    <article className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+   561→      {/* Foto 4:3 */}
+   562→      <button
+   563→        type="button"
+   564→        onClick={() => onOpenGallery(0)}
+   565→        className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-100"
+   566→        aria-label={`Lihat foto ${v.brand} ${v.model}`}
+   567→      >
+   568→        <VehiclePhoto
+   569→          src={v.photos[0]}
+   570→          alt={`Foto ${v.brand} ${v.model} ${v.year}`}
+   571→          className={`absolute inset-0 h-full w-full object-cover ${isSold ? 'opacity-75' : ''}`}
+   572→        />
+   573→        <span className="absolute left-2 top-2">
+   574→          <StatusBadge status={v.status} className="shadow-sm" />
+   575→        </span>
+   576→        {v.photos.length > 1 && (
+   577→          <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-bold text-white">
+   578→            <Camera className="h-3 w-3" aria-hidden /> {v.photos.length}
+   579→          </span>
+   580→        )}
+   581→      </button>
+   582→
+   583→      {/* Info */}
+   584→      <div className="flex flex-1 flex-col gap-2 p-3">
+   585→        <div>
+   586→          <h3 className="text-sm font-extrabold leading-snug text-slate-900">
+   587→            {v.brand} {v.model}
+   588→          </h3>
+   589→          <p className="mt-0.5 text-xs font-semibold text-slate-500">
+   590→            {v.year} • {v.licensePlate}
+   591→            {v.odometer != null ? ` • ${formatKm(v.odometer)}` : ''}
+   592→          </p>
+   593→        </div>
+   594→
+   595→        {/* Badge lokasi unit — hanya tampil bila showroom punya cabang */}
+   596→        {showLocation && (
+   597→          <div className="flex items-center justify-between gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+   598→            <span className="flex min-w-0 items-center gap-1 text-[11px] font-bold text-slate-700">
+   599→              <MapPin className="h-3.5 w-3.5 shrink-0 text-blue-700" aria-hidden />
+   600→              <span className="truncate">Lokasi: {locName}</span>
+   601→            </span>
+   602→            {locMaps && (
+   603→              <a
+   604→                href={locMaps}
+   605→                target="_blank"
+   606→                rel="noreferrer"
+   607→                className="inline-flex shrink-0 items-center gap-0.5 rounded border border-blue-200 bg-white px-1.5 py-0.5 text-[10px] font-extrabold text-blue-700 hover:bg-blue-50"
+   608→                title={`Buka lokasi ${locName} di Google Maps`}
+   609→                onClick={(e) => e.stopPropagation()}
+   610→              >
+   611→                <ExternalLink className="h-3 w-3" aria-hidden /> Maps
+   612→              </a>
+   613→            )}
+   614→          </div>
+   615→        )}
+   616→
+   617→        <div className="flex flex-wrap gap-1">
+   618→          {v.category && (
+   619→            <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
+   620→              {v.category}
+   621→            </span>
+   622→          )}
+   623→          {v.taxStatus && (
+   624→            <span
+   625→              className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${
+   626→                taxAlive
+   627→                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+   628→                  : 'border-red-200 bg-red-50 text-red-700'
+   629→              }`}
+   630→            >
+   631→              Pajak: {v.taxStatus}
+   632→            </span>
+   633→          )}
+   634→          {v.documentStatus && (
+   635→            <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+   636→              {v.documentStatus}
+   637→            </span>
+   638→          )}
+   639→          {v.color && (
+   640→            <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+   641→              {v.color}
+   642→            </span>
+   643→          )}
+   644→        </div>
+   645→
+   646→        <div className="mt-auto">
+   647→          <p className="text-xl font-extrabold tracking-tight text-slate-900">
+   648→            {formatRupiah(v.sellingPrice)}
+   649→          </p>
+   650→          {v.commissionAmount != null && !isSold && (
+   651→            <p className="text-xs font-extrabold text-emerald-700">
+   652→              Komisi: {formatRupiah(v.commissionAmount)}
+   653→            </p>
+   654→          )}
+   655→        </div>
+   656→
+   657→        {isHeld && v.activeHold && (
+   658→          <div className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5">
+   659→            <p className="text-[11px] font-bold leading-tight text-amber-800">
+   660→              Ditahan oleh {v.activeHold.marketingName} •{' '}
+   661→              <Countdown
+   662→                expiresAt={v.activeHold.expiresAt}
+   663→                className="tabular-nums"
+   664→                onDone={onHoldExpired}
+   665→              />
+   666→            </p>
+   667→          </div>
+   668→        )}
+   669→
+   670→        {/* Aksi */}
+   671→        {!isSold && (
+   672→          <div className="grid grid-cols-2 gap-2">
+   673→            <Button
+   674→              variant="outline"
+   675→              className="h-11 border-slate-300 bg-white text-xs font-extrabold text-blue-800 hover:bg-blue-50"
+   676→              onClick={onCopy}
+   677→            >
+   678→              <ClipboardCopy className="mr-1 h-4 w-4" /> Salin Iklan
+   679→            </Button>
+   680→            <Button
+   681→              className="h-11 bg-blue-700 text-xs font-extrabold hover:bg-blue-800"
+   682→              disabled={isHeld}
+   683→              onClick={onHold}
+   684→              title={isHeld ? 'Unit sedang ditahan marketing lain' : undefined}
+   685→            >
+   686→              <Lock className="mr-1 h-4 w-4" />
+   687→              {isHeld ? 'Ditahan' : 'Tahan Unit'}
+   688→            </Button>
+   689→          </div>
+   690→        )}
+   691→      </div>
+   692→    </article>
+   693→  )
+   694→}
+   695→

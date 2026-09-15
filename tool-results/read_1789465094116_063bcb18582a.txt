@@ -1,0 +1,784 @@
+     1→'use client'
+     2→
+     3→import { useCallback, useEffect, useMemo, useState } from 'react'
+     4→import Link from 'next/link'
+     5→import { toast } from 'sonner'
+     6→import {
+     7→  Copy,
+     8→  Inbox,
+     9→  Package,
+    10→  Pencil,
+    11→  Plus,
+    12→  Search,
+    13→  Share2,
+    14→  Trash2,
+    15→} from 'lucide-react'
+    16→import { Countdown } from '@/components/countdown'
+    17→import { AppIcon } from '@/components/app-icon'
+    18→import { StatusBadge } from '@/components/status-badge'
+    19→import { VehiclePhoto } from '@/components/vehicle-photo'
+    20→import { Input } from '@/components/ui/input'
+    21→import {
+    22→  AdminGate,
+    23→  AdminNav,
+    24→  SessionBadge,
+    25→  ShowroomNotFound,
+    26→} from '@/components/admin-shell'
+    27→import { SellDialog } from '@/components/sell-dialog'
+    28→import { WABroadcastDialog } from '@/components/wa-broadcast-dialog'
+    29→import {
+    30→  AlertDialog,
+    31→  AlertDialogAction,
+    32→  AlertDialogCancel,
+    33→  AlertDialogContent,
+    34→  AlertDialogDescription,
+    35→  AlertDialogFooter,
+    36→  AlertDialogHeader,
+    37→  AlertDialogTitle,
+    38→} from '@/components/ui/alert-dialog'
+    39→import { Button } from '@/components/ui/button'
+    40→import {
+    41→  Select,
+    42→  SelectContent,
+    43→  SelectItem,
+    44→  SelectTrigger,
+    45→  SelectValue,
+    46→} from '@/components/ui/select'
+    47→import { PLAN_LABELS, STATUS_LABELS } from '@/lib/constants'
+    48→import {
+    49→  copyToClipboard,
+    50→  formatKm,
+    51→  formatPhoneDisplay,
+    52→  formatRupiah,
+    53→  isTaxAlive,
+    54→  waLink,
+    55→} from '@/lib/format'
+    56→import type {
+    57→  AdminInventoryResponse,
+    58→  AdminVehicle,
+    59→  TaxonomyResponse,
+    60→  VehicleStatus,
+    61→} from '@/lib/types'
+    62→import { VehicleForm } from './vehicle-form'
+    63→
+    64→const STATUS_TONE: Record<VehicleStatus, string> = {
+    65→  available: 'bg-emerald-600 text-white',
+    66→  hold: 'bg-amber-500 text-white',
+    67→  sold: 'bg-red-700 text-white',
+    68→}
+    69→
+    70→export function AdminClient({ slug }: { slug: string }) {
+    71→  return (
+    72→    <AdminGate slug={slug}>
+    73→      {(session) => <Dashboard slug={slug} session={session} />}
+    74→    </AdminGate>
+    75→  )
+    76→}
+    77→
+    78→function Dashboard({
+    79→  slug,
+    80→  session,
+    81→}: {
+    82→  slug: string
+    83→  session: { role: 'owner' | 'admin'; name: string; slug: string }
+    84→}) {
+    85→  const [data, setData] = useState<AdminInventoryResponse | null>(null)
+    86→  const [loading, setLoading] = useState(true)
+    87→  const [loadError, setLoadError] = useState<string | null>(null)
+    88→  const [notFound, setNotFound] = useState(false)
+    89→
+    90→  const [taxonomy, setTaxonomy] = useState<TaxonomyResponse | null>(null)
+    91→  const [search, setSearch] = useState('')
+    92→  const [statusFilter, setStatusFilter] = useState<'all' | VehicleStatus>('all')
+    93→  const [brandFilter, setBrandFilter] = useState('all')
+    94→  const [categoryFilter, setCategoryFilter] = useState('all')
+    95→  const [formOpen, setFormOpen] = useState(false)
+    96→  const [editing, setEditing] = useState<AdminVehicle | null>(null)
+    97→  const [deleteTarget, setDeleteTarget] = useState<AdminVehicle | null>(null)
+    98→  const [busyId, setBusyId] = useState<string | null>(null)
+    99→  // Dialog terjual & broadcast
+   100→  const [sellTarget, setSellTarget] = useState<AdminVehicle | null>(null)
+   101→  const [waTarget, setWaTarget] = useState<{ vehicle: AdminVehicle; kind: 'new' | 'sold' } | null>(
+   102→    null,
+   103→  )
+   104→
+   105→  const isOwner = session.role === 'owner'
+   106→
+   107→  const refetch = useCallback(async () => {
+   108→    try {
+   109→      const res = await fetch(`/api/admin/${slug}/inventory`, { cache: 'no-store' })
+   110→      if (res.status === 404) {
+   111→        setNotFound(true)
+   112→        return
+   113→      }
+   114→      if (res.status === 401) {
+   115→        window.location.reload()
+   116→        return
+   117→      }
+   118→      if (!res.ok) {
+   119→        const j = await res.json().catch(() => ({}))
+   120→        throw new Error(j.error || 'Gagal memuat data.')
+   121→      }
+   122→      setData(await res.json())
+   123→      setLoadError(null)
+   124→    } catch (e) {
+   125→      setLoadError(e instanceof Error ? e.message : 'Gagal memuat data.')
+   126→    } finally {
+   127→      setLoading(false)
+   128→    }
+   129→  }, [slug])
+   130→
+   131→  useEffect(() => {
+   132→    refetch()
+   133→  }, [refetch])
+   134→
+   135→  useEffect(() => {
+   136→    fetch(`/api/admin/${slug}/taxonomy`, { cache: 'no-store' })
+   137→      .then((r) => (r.ok ? r.json() : null))
+   138→      .then((j) => j && setTaxonomy(j))
+   139→      .catch(() => {})
+   140→  }, [slug])
+   141→
+   142→  const filtered = useMemo(() => {
+   143→    if (!data) return []
+   144→    const q = search.trim().toLowerCase()
+   145→    return data.vehicles.filter((v) => {
+   146→      if (statusFilter !== 'all' && v.status !== statusFilter) return false
+   147→      if (brandFilter !== 'all' && v.brand !== brandFilter) return false
+   148→      if (categoryFilter !== 'all' && v.category !== categoryFilter) return false
+   149→      if (!q) return true
+   150→      return [v.brand, v.model, v.licensePlate, v.color ?? '', String(v.year)]
+   151→        .join(' ')
+   152→        .toLowerCase()
+   153→        .includes(q)
+   154→    })
+   155→  }, [data, search, statusFilter, brandFilter, categoryFilter])
+   156→
+   157→  async function setVehicleStatusDirect(v: AdminVehicle, status: VehicleStatus) {
+   158→    setBusyId(v.id)
+   159→    try {
+   160→      const res = await fetch(`/api/admin/vehicles/${v.id}`, {
+   161→        method: 'PATCH',
+   162→        headers: { 'Content-Type': 'application/json' },
+   163→        body: JSON.stringify({ status }),
+   164→      })
+   165→      const j = await res.json().catch(() => ({}))
+   166→      if (!res.ok) throw new Error(j.error || 'Gagal mengubah status.')
+   167→      toast.success(`"${v.brand} ${v.model}" sekarang ${STATUS_LABELS[status].toLowerCase()}.`)
+   168→      await refetch()
+   169→    } catch (e) {
+   170→      toast.error(e instanceof Error ? e.message : 'Gagal mengubah status.')
+   171→    } finally {
+   172→      setBusyId(null)
+   173→    }
+   174→  }
+   175→
+   176→  /** Quick-action status. Terjual lewat dialog pencatatan penjualan. */
+   177→  function handleStatus(v: AdminVehicle, s: VehicleStatus) {
+   178→    if (s === 'sold') {
+   179→      setSellTarget(v)
+   180→      return
+   181→    }
+   182→    setVehicleStatusDirect(v, s)
+   183→  }
+   184→
+   185→  async function confirmDelete() {
+   186→    if (!deleteTarget) return
+   187→    setBusyId(deleteTarget.id)
+   188→    try {
+   189→      const res = await fetch(`/api/admin/vehicles/${deleteTarget.id}`, {
+   190→        method: 'DELETE',
+   191→      })
+   192→      if (!res.ok) {
+   193→        const j = await res.json().catch(() => ({}))
+   194→        throw new Error(j.error || 'Gagal menghapus unit.')
+   195→      }
+   196→      toast.success(`"${deleteTarget.brand} ${deleteTarget.model}" dihapus dari stok.`)
+   197→      setDeleteTarget(null)
+   198→      await refetch()
+   199→    } catch (e) {
+   200→      toast.error(e instanceof Error ? e.message : 'Gagal menghapus unit.')
+   201→    } finally {
+   202→      setBusyId(null)
+   203→    }
+   204→  }
+   205→
+   206→  async function copyCatalogLink() {
+   207→    const ok = await copyToClipboard(`${window.location.origin}/s/${slug}`)
+   208→    if (ok) toast.success('Link katalog disalin — bagikan ke tim marketing!')
+   209→    else toast.error('Gagal menyalin link.')
+   210→  }
+   211→
+   212→  async function setHoldStatusById(vehicleId: string, status: VehicleStatus) {
+   213→    const v = data?.vehicles.find((x) => x.id === vehicleId)
+   214→    if (v) handleStatus(v, status)
+   215→  }
+   216→
+   217→  if (notFound) return <ShowroomNotFound slug={slug} />
+   218→
+   219→  const quotaFull = data?.quota ? data.quota.active >= data.quota.max : false
+   220→  const licenseExpired = data?.license ? data.license.status !== 'active' : false
+   221→
+   222→  return (
+   223→    <>
+   224→      {/* Header */}
+   225→      <header className="border-b border-slate-200 bg-white">
+   226→        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 px-4">
+   227→          <div className="flex min-w-0 items-center gap-2.5">
+   228→            {data?.showroom.logoUrl ? (
+   229→              <img
+   230→                src={data.showroom.logoUrl}
+   231→                alt={`Logo ${data.showroom.name}`}
+   232→                className="h-8 w-8 shrink-0 rounded-md object-cover ring-1 ring-slate-200"
+   233→              />
+   234→            ) : (
+   235→              <AppIcon className="h-8 w-8 shrink-0" />
+   236→            )}
+   237→            <div className="min-w-0 leading-tight">
+   238→              <p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+   239→                {isOwner ? 'Dashboard Owner' : 'Dashboard Admin'}
+   240→              </p>
+   241→              <h1 className="truncate text-sm font-extrabold text-slate-900">
+   242→                {data?.showroom.name ?? 'Memuat...'}
+   243→              </h1>
+   244→            </div>
+   245→          </div>
+   246→          <div className="flex shrink-0 items-center gap-2">
+   247→            <Button
+   248→              variant="outline"
+   249→              size="sm"
+   250→              className="h-9 border-slate-300 text-xs font-bold"
+   251→              onClick={copyCatalogLink}
+   252→            >
+   253→              <Copy className="mr-1 h-3.5 w-3.5" />
+   254→              <span className="hidden sm:inline">Salin Link Katalog</span>
+   255→              <span className="sm:hidden">Salin</span>
+   256→            </Button>
+   257→            <Button
+   258→              asChild
+   259→              size="sm"
+   260→              className="h-9 bg-blue-700 text-xs font-bold hover:bg-blue-800"
+   261→            >
+   262→              <Link href={`/s/${slug}`} target="_blank">
+   263→                Lihat Katalog
+   264→              </Link>
+   265→            </Button>
+   266→            <div className="hidden sm:block">
+   267→              <SessionBadge session={session} />
+   268→            </div>
+   269→          </div>
+   270→        </div>
+   271→      </header>
+   272→
+   273→      <AdminNav slug={slug} role={session.role} />
+   274→
+   275→      <div className="mx-auto w-full max-w-6xl flex-1 space-y-4 px-4 py-4">
+   276→        {loading && (
+   277→          <div className="space-y-3">
+   278→            <div className="h-20 animate-pulse rounded-lg bg-slate-200" />
+   279→            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+   280→              {[0, 1, 2, 3].map((i) => (
+   281→                <div key={i} className="h-24 animate-pulse rounded-lg bg-slate-200" />
+   282→              ))}
+   283→            </div>
+   284→            <div className="h-40 animate-pulse rounded-lg bg-slate-200" />
+   285→          </div>
+   286→        )}
+   287→
+   288→        {loadError && !loading && (
+   289→          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
+   290→            <p className="text-sm font-bold text-red-800">{loadError}</p>
+   291→            <Button
+   292→              variant="outline"
+   293→              className="mt-3 h-10 border-red-300 text-xs font-bold"
+   294→              onClick={() => {
+   295→                setLoading(true)
+   296→                refetch()
+   297→              }}
+   298→            >
+   299→              Coba Lagi
+   300→            </Button>
+   301→          </div>
+   302→        )}
+   303→
+   304→        {data && (
+   305→          <>
+   306→            {isOwner && licenseExpired && (
+   307→              <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
+   308→                Lisensi kedaluwarsa — perbarui ke distributor agar stok bisa ditambah.
+   309→              </div>
+   310→            )}
+   311→
+   312→            {/* Lisensi & kuota — hanya owner (admin tidak berhak melihat lisensi) */}
+   313→            {isOwner && data.license && data.quota && (
+   314→              <section className="rounded-lg border border-slate-200 bg-white p-4">
+   315→                <div className="flex flex-wrap items-center justify-between gap-2">
+   316→                  <div>
+   317→                    <p className="text-xs font-bold text-slate-900">
+   318→                      Lisensi{' '}
+   319→                      <span className="font-mono">{data.license.licenseKey}</span>
+   320→                    </p>
+   321→                    <p className="mt-0.5 text-xs text-slate-500">
+   322→                      Plan {PLAN_LABELS[data.license.planType] ?? data.license.planType} •{' '}
+   323→                      {data.license.expiresAt
+   324→                        ? `berlaku s/d ${new Date(data.license.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`
+   325→                        : 'Lifetime'}
+   326→                    </p>
+   327→                  </div>
+   328→                  <p className="text-xs font-extrabold text-slate-700">
+   329→                    {data.quota.active}/{data.quota.max} unit aktif
+   330→                  </p>
+   331→                </div>
+   332→                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+   333→                  <div
+   334→                    className={`h-full rounded-full ${quotaFull ? 'bg-red-600' : 'bg-blue-700'}`}
+   335→                    style={{
+   336→                      width: `${Math.min(100, (data.quota.active / Math.max(1, data.quota.max)) * 100)}%`,
+   337→                    }}
+   338→                  />
+   339→                </div>
+   340→              </section>
+   341→            )}
+   342→
+   343→            {/* Statistik */}
+   344→            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+   345→              <div className="rounded-lg border border-slate-200 bg-white p-4">
+   346→                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+   347→                  Stok Aktif
+   348→                </p>
+   349→                <p className="mt-1 text-2xl font-extrabold text-slate-900">
+   350→                  {data.stats.available}
+   351→                </p>
+   352→                <p className="text-[11px] text-slate-400">unit siap jual</p>
+   353→              </div>
+   354→              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+   355→                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">
+   356→                  Ditahan
+   357→                </p>
+   358→                <p className="mt-1 text-2xl font-extrabold text-amber-900">{data.stats.hold}</p>
+   359→                <p className="text-[11px] text-amber-700">unit di-hold marketing</p>
+   360→              </div>
+   361→              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+   362→                <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">
+   363→                  Terjual
+   364→                </p>
+   365→                <p className="mt-1 text-2xl font-extrabold text-red-900">{data.stats.sold}</p>
+   366→                <p className="text-[11px] text-red-700">unit deal</p>
+   367→              </div>
+   368→              {isOwner ? (
+   369→                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+   370→                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">
+   371→                    Perputaran Modal
+   372→                  </p>
+   373→                  <p className="mt-1 text-base font-extrabold leading-snug text-slate-900">
+   374→                    {formatRupiah(data.stats.capitalTurnover)}
+   375→                  </p>
+   376→                  <p className="text-[11px] text-blue-700">
+   377→                    Nilai jual stok: {formatRupiah(data.stats.stockValue)}
+   378→                  </p>
+   379→                </div>
+   380→              ) : (
+   381→                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+   382→                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">
+   383→                    Nilai Jual Stok
+   384→                  </p>
+   385→                  <p className="mt-1 text-base font-extrabold leading-snug text-slate-900">
+   386→                    {formatRupiah(data.stats.stockValue)}
+   387→                  </p>
+   388→                  <p className="text-[11px] text-blue-700">total harga jual unit aktif</p>
+   389→                </div>
+   390→              )}
+   391→            </section>
+   392→
+   393→            {/* Tahanan aktif */}
+   394→            {data.holds.length > 0 && (
+   395→              <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+   396→                <h2 className="text-sm font-extrabold text-amber-900">
+   397→                  Tahanan Aktif ({data.holds.length})
+   398→                </h2>
+   399→                <div className="mt-2 space-y-2">
+   400→                  {data.holds.map((h) => (
+   401→                    <div
+   402→                      key={h.id}
+   403→                      className="flex flex-col gap-2 rounded-md border border-amber-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+   404→                    >
+   405→                      <div className="min-w-0">
+   406→                        <p className="truncate text-sm font-bold text-slate-900">
+   407→                          {h.vehicleLabel}
+   408→                        </p>
+   409→                        <p className="mt-0.5 text-xs text-slate-600">
+   410→                          Ditahan oleh{' '}
+   411→                          <span className="font-bold text-slate-900">{h.marketingName}</span>{' '}
+   412→                          •{' '}
+   413→                          <a
+   414→                            href={waLink(h.marketingPhone)}
+   415→                            target="_blank"
+   416→                            rel="noreferrer"
+   417→                            className="font-bold text-emerald-700 underline"
+   418→                          >
+   419→                            {formatPhoneDisplay(h.marketingPhone)}
+   420→                          </a>
+   421→                        </p>
+   422→                      </div>
+   423→                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+   424→                        <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-extrabold tabular-nums text-amber-800">
+   425→                          <Countdown expiresAt={h.expiresAt} onDone={() => refetch()} />
+   426→                        </span>
+   427→                        <Button
+   428→                          size="sm"
+   429→                          disabled={busyId === h.vehicleId}
+   430→                          className="h-9 bg-emerald-700 text-xs font-bold hover:bg-emerald-800"
+   431→                          onClick={() => setHoldStatusById(h.vehicleId, 'sold')}
+   432→                        >
+   433→                          Deal (Terjual)
+   434→                        </Button>
+   435→                        <Button
+   436→                          size="sm"
+   437→                          variant="outline"
+   438→                          disabled={busyId === h.vehicleId}
+   439→                          className="h-9 border-slate-300 text-xs font-bold"
+   440→                          onClick={() => setHoldStatusById(h.vehicleId, 'available')}
+   441→                        >
+   442→                          Lepas
+   443→                        </Button>
+   444→                      </div>
+   445→                    </div>
+   446→                  ))}
+   447→                </div>
+   448→              </section>
+   449→            )}
+   450→
+   451→            {/* Toolbar */}
+   452→            <section className="flex flex-col gap-2 sm:flex-row sm:items-center">
+   453→              <div className="relative flex-1">
+   454→                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+   455→                <Input
+   456→                  value={search}
+   457→                  onChange={(e) => setSearch(e.target.value)}
+   458→                  placeholder="Cari merk, model, atau plat..."
+   459→                  className="h-10 bg-white pl-9"
+   460→                  aria-label="Cari unit"
+   461→                />
+   462→              </div>
+   463→              <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+   464→                {(['all', 'available', 'hold', 'sold'] as const).map((s) => (
+   465→                  <button
+   466→                    key={s}
+   467→                    type="button"
+   468→                    onClick={() => setStatusFilter(s)}
+   469→                    className={`h-9 flex-1 whitespace-nowrap rounded-md px-3 text-xs font-bold sm:flex-none ${
+   470→                      statusFilter === s
+   471→                        ? 'bg-slate-900 text-white'
+   472→                        : 'text-slate-600 hover:bg-slate-100'
+   473→                    }`}
+   474→                  >
+   475→                    {s === 'all' ? 'Semua' : STATUS_LABELS[s]}
+   476→                  </button>
+   477→                ))}
+   478→              </div>
+   479→              {/* Filter kategori & merek dari taxonomy showroom */}
+   480→              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+   481→                <SelectTrigger className="h-10 w-full bg-white text-xs font-bold sm:w-40" aria-label="Filter kategori">
+   482→                  <SelectValue placeholder="Semua Kategori" />
+   483→                </SelectTrigger>
+   484→                <SelectContent>
+   485→                  <SelectItem value="all">Semua Kategori</SelectItem>
+   486→                  {(taxonomy?.categories ?? []).map((c) => (
+   487→                    <SelectItem key={c} value={c}>
+   488→                      {c}
+   489→                    </SelectItem>
+   490→                  ))}
+   491→                </SelectContent>
+   492→              </Select>
+   493→              <Select value={brandFilter} onValueChange={setBrandFilter}>
+   494→                <SelectTrigger className="h-10 w-full bg-white text-xs font-bold sm:w-36" aria-label="Filter merek">
+   495→                  <SelectValue placeholder="Semua Merek" />
+   496→                </SelectTrigger>
+   497→                <SelectContent>
+   498→                  <SelectItem value="all">Semua Merek</SelectItem>
+   499→                  {(taxonomy?.brands ?? []).map((b) => (
+   500→                    <SelectItem key={b} value={b}>
+   501→                      {b}
+   502→                    </SelectItem>
+   503→                  ))}
+   504→                </SelectContent>
+   505→              </Select>
+   506→              <Button
+   507→                className="h-10 bg-blue-700 px-4 text-sm font-extrabold hover:bg-blue-800"
+   508→                disabled={quotaFull}
+   509→                title={quotaFull ? 'Kuota lisensi penuh' : undefined}
+   510→                onClick={() => {
+   511→                  setEditing(null)
+   512→                  setFormOpen(true)
+   513→                }}
+   514→              >
+   515→                <Plus className="mr-1 h-4 w-4" /> Tambah Motor
+   516→              </Button>
+   517→            </section>
+   518→
+   519→            {/* Inventaris */}
+   520→            {filtered.length === 0 ? (
+   521→              <div className="flex flex-col items-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
+   522→                <Package className="h-8 w-8 text-slate-300" aria-hidden />
+   523→                <p className="mt-2 text-sm font-bold text-slate-700">
+   524→                  {data.vehicles.length === 0
+   525→                    ? 'Belum ada unit di showroom ini.'
+   526→                    : 'Tidak ada unit yang cocok dengan filter.'}
+   527→                </p>
+   528→                {data.vehicles.length === 0 && (
+   529→                  <Button
+   530→                    className="mt-4 h-11 bg-blue-700 font-bold hover:bg-blue-800"
+   531→                    disabled={quotaFull}
+   532→                    onClick={() => {
+   533→                      setEditing(null)
+   534→                      setFormOpen(true)
+   535→                    }}
+   536→                  >
+   537→                    <Plus className="mr-1 h-4 w-4" /> Tambah Motor Pertama
+   538→                  </Button>
+   539→                )}
+   540→              </div>
+   541→            ) : (
+   542→              <section className="grid gap-3 md:grid-cols-2">
+   543→                {filtered.map((v) => (
+   544→                  <AdminVehicleCard
+   545→                    key={v.id}
+   546→                    v={v}
+   547→                    isOwner={isOwner}
+   548→                    busy={busyId === v.id}
+   549→                    onStatus={(s) => handleStatus(v, s)}
+   550→                    onEdit={() => {
+   551→                      setEditing(v)
+   552→                      setFormOpen(true)
+   553→                    }}
+   554→                    onDelete={() => setDeleteTarget(v)}
+   555→                    onBroadcast={(kind) => setWaTarget({ vehicle: v, kind })}
+   556→                  />
+   557→                ))}
+   558→              </section>
+   559→            )}
+   560→          </>
+   561→        )}
+   562→      </div>
+   563→
+   564→      {/* Form tambah/edit */}
+   565→      {data && (
+   566→        <VehicleForm
+   567→          slug={slug}
+   568→          open={formOpen}
+   569→          onOpenChange={setFormOpen}
+   570→          onSaved={refetch}
+   571→          editing={editing}
+   572→          taxonomy={taxonomy}
+   573→          canSeeBasePrice={isOwner}
+   574→          onTaxonomyChanged={setTaxonomy}
+   575→        />
+   576→      )}
+   577→
+   578→      {/* Dialog catat penjualan */}
+   579→      <SellDialog
+   580→        vehicle={sellTarget}
+   581→        open={sellTarget != null}
+   582→        onOpenChange={(o) => !o && setSellTarget(null)}
+   583→        onSold={(v) => {
+   584→          setSellTarget(null)
+   585→          refetch()
+   586→          setWaTarget({ vehicle: v, kind: 'sold' })
+   587→        }}
+   588→      />
+   589→
+   590→      {/* Dialog broadcast WA */}
+   591→      {waTarget && data && (
+   592→        <WABroadcastDialog
+   593→          open
+   594→          onOpenChange={(o) => !o && setWaTarget(null)}
+   595→          slug={slug}
+   596→          showroomName={data.showroom.name}
+   597→          vehicle={waTarget.vehicle}
+   598→          initialKind={waTarget.kind}
+   599→        />
+   600→      )}
+   601→
+   602→      {/* Konfirmasi hapus */}
+   603→      <AlertDialog
+   604→        open={deleteTarget != null}
+   605→        onOpenChange={(o) => !o && setDeleteTarget(null)}
+   606→      >
+   607→        <AlertDialogContent className="sm:max-w-sm">
+   608→          <AlertDialogHeader>
+   609→            <AlertDialogTitle className="text-base font-extrabold">
+   610→              Hapus unit ini?
+   611→            </AlertDialogTitle>
+   612→            <AlertDialogDescription>
+   613→              {deleteTarget
+   614→                ? `"${deleteTarget.brand} ${deleteTarget.model} (${deleteTarget.licensePlate})" beserta riwayat tahanannya akan dihapus permanen.`
+   615→                : ''}
+   616→            </AlertDialogDescription>
+   617→          </AlertDialogHeader>
+   618→          <AlertDialogFooter>
+   619→            <AlertDialogCancel className="h-10">Batal</AlertDialogCancel>
+   620→            <AlertDialogAction
+   621→              className="h-10 bg-red-700 font-bold hover:bg-red-800"
+   622→              onClick={(e) => {
+   623→                e.preventDefault()
+   624→                confirmDelete()
+   625→              }}
+   626→            >
+   627→              Ya, Hapus
+   628→            </AlertDialogAction>
+   629→          </AlertDialogFooter>
+   630→        </AlertDialogContent>
+   631→      </AlertDialog>
+   632→    </>
+   633→  )
+   634→}
+   635→
+   636→function AdminVehicleCard({
+   637→  v,
+   638→  isOwner,
+   639→  busy,
+   640→  onStatus,
+   641→  onEdit,
+   642→  onDelete,
+   643→  onBroadcast,
+   644→}: {
+   645→  v: AdminVehicle
+   646→  isOwner: boolean
+   647→  busy: boolean
+   648→  onStatus: (s: VehicleStatus) => void
+   649→  onEdit: () => void
+   650→  onDelete: () => void
+   651→  onBroadcast: (kind: 'new' | 'sold') => void
+   652→}) {
+   653→  return (
+   654→    <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+   655→      <div className="flex gap-3">
+   656→        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-100 sm:h-24 sm:w-24">
+   657→          <VehiclePhoto
+   658→            src={v.photos[0]}
+   659→            alt={`Foto ${v.brand} ${v.model}`}
+   660→            className="h-full w-full object-cover"
+   661→          />
+   662→          <div className="absolute bottom-1 left-1">
+   663→            <StatusBadge status={v.status} />
+   664→          </div>
+   665→        </div>
+   666→
+   667→        <div className="min-w-0 flex-1">
+   668→          <h3 className="truncate text-sm font-extrabold text-slate-900">
+   669→            {v.brand} {v.model}
+   670→          </h3>
+   671→          <p className="mt-0.5 text-xs text-slate-500">
+   672→            {v.year} • {v.licensePlate} • {formatKm(v.odometer)}
+   673→            {v.color ? ` • ${v.color}` : ''}
+   674→          </p>
+   675→          <div className="mt-1.5 flex flex-wrap gap-1">
+   676→            {v.category && (
+   677→              <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
+   678→                {v.category}
+   679→              </span>
+   680→            )}
+   681→            {v.taxStatus && (
+   682→              <span
+   683→                className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${
+   684→                  isTaxAlive(v.taxStatus)
+   685→                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+   686→                    : 'border-red-200 bg-red-50 text-red-700'
+   687→                }`}
+   688→              >
+   689→                Pajak: {v.taxStatus}
+   690→              </span>
+   691→            )}
+   692→            {v.documentStatus && (
+   693→              <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+   694→                {v.documentStatus}
+   695→              </span>
+   696→            )}
+   697→          </div>
+   698→          <div className={`mt-2 grid gap-2 ${isOwner ? 'grid-cols-3' : 'grid-cols-2'}`}>
+   699→            <div>
+   700→              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+   701→                Harga Jual
+   702→              </p>
+   703→              <p className="text-sm font-extrabold text-slate-900">
+   704→                {formatRupiah(v.sellingPrice)}
+   705→              </p>
+   706→            </div>
+   707→            {isOwner && (
+   708→              <div>
+   709→                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+   710→                  Modal
+   711→                </p>
+   712→                <p className="text-sm font-bold text-slate-700">{formatRupiah(v.basePrice)}</p>
+   713→              </div>
+   714→            )}
+   715→            <div>
+   716→              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+   717→                Komisi
+   718→              </p>
+   719→              <p className="text-sm font-bold text-emerald-700">
+   720→                {formatRupiah(v.commissionAmount)}
+   721→              </p>
+   722→            </div>
+   723→          </div>
+   724→          {v.activeHold && (
+   725→            <p className="mt-1.5 rounded bg-amber-50 px-1.5 py-1 text-[11px] font-bold text-amber-800">
+   726→              Ditahan oleh {v.activeHold.marketingName} •{' '}
+   727→              <Countdown
+   728→                expiresAt={v.activeHold.expiresAt}
+   729→                className="tabular-nums"
+   730→              />
+   731→            </p>
+   732→          )}
+   733→        </div>
+   734→      </div>
+   735→
+   736→      <div className="mt-3 flex items-center gap-2">
+   737→        <div className="flex flex-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+   738→          {(['available', 'hold', 'sold'] as const).map((s) => (
+   739→            <button
+   740→              key={s}
+   741→              type="button"
+   742→              disabled={busy}
+   743→              onClick={() => onStatus(s)}
+   744→              className={`h-8 flex-1 rounded-md text-[11px] font-extrabold disabled:opacity-50 ${
+   745→                v.status === s ? STATUS_TONE[s] : 'text-slate-500 hover:bg-white'
+   746→              }`}
+   747→            >
+   748→              {STATUS_LABELS[s]}
+   749→            </button>
+   750→          ))}
+   751→        </div>
+   752→        <Button
+   753→          variant="outline"
+   754→          size="icon"
+   755→          className="h-9 w-9 shrink-0 border-slate-300 hover:bg-emerald-50"
+   756→          onClick={() => onBroadcast(v.status === 'sold' ? 'sold' : 'new')}
+   757→          aria-label={`Broadcast WA ${v.brand} ${v.model}`}
+   758→          title="Kirim update ke grup WA"
+   759→        >
+   760→          <Share2 className="h-4 w-4 text-emerald-700" />
+   761→        </Button>
+   762→        <Button
+   763→          variant="outline"
+   764→          size="icon"
+   765→          className="h-9 w-9 shrink-0 border-slate-300"
+   766→          onClick={onEdit}
+   767→          aria-label={`Edit ${v.brand} ${v.model}`}
+   768→        >
+   769→          <Pencil className="h-4 w-4 text-slate-600" />
+   770→        </Button>
+   771→        <Button
+   772→          variant="outline"
+   773→          size="icon"
+   774→          className="h-9 w-9 shrink-0 border-slate-300 hover:bg-red-50"
+   775→          onClick={onDelete}
+   776→          aria-label={`Hapus ${v.brand} ${v.model}`}
+   777→        >
+   778→          <Trash2 className="h-4 w-4 text-red-600" />
+   779→        </Button>
+   780→      </div>
+   781→    </article>
+   782→  )
+   783→}
+   784→
