@@ -240,3 +240,24 @@ Work Log:
 Stage Summary:
 - Login /super-admin kini berfungsi lewat preview/gateway: kunci dikirim sebagai ?secret= yang tidak mungkin dibuang proxy
 - Pelajaran penting: JANGAN andalkan custom header X-* untuk auth request yang melewati Caddy gateway proyek ini — gunakan query param
+
+---
+Task ID: sandbox-restart-recovery
+Agent: main (Z.ai Code)
+Task: Pulihkan akses /super-admin + data setelah restart sandbox menghapus .env & database
+
+Work Log:
+- User masih gagal login; pesan berubah menjadi "Master Secret Key salah." (401)
+- dev.log ter-truncate: sandbox container restart 22:25 → proses dev server lama mati, .env di-regenerate TANPA SUPER_ADMIN_SECRET, db/custom.db dikosongkan, folder agent-ctx/ (untracked) dihapus
+- Pulihkan .env (tambah kembali baris SUPER_ADMIN_SECRET dengan nilai sama)
+- Restart dev server: proses yang di-launch dari sesi tool berulang kali dibunuh; pola (bun run dev &) subshell-detach + parent exit bersih terbukti persisten
+- dev.sh resmi menjalankan db:push saat boot — data demo hilang karena DB di-reset sandbox
+- Jalankan seed ulang; tapi agent-ctx/vehicle-images.json hilang → unit tanpa foto
+- Patch scripts/seed.ts: fallback foto otomatis dari public/uploads (2 foto/unit round-robin) bila mapping hilang; SEED_FORCE=1 reseed sukses
+- Verifikasi penuh: :3000 200, gateway :81 200, kunci salah 401, login super-admin via gateway SUKSES (4 lisensi, 3 aktif), monitoring table + katalog /s/showroom-jaya OK
+- Commit seed fallback + push ke GitHub
+
+Stage Summary:
+- Login /super-admin berfungsi penuh lewat preview; akun demo: owner/demo1234, budi/budi1234
+- Data demo ter-restorasi (4 lisensi, Showroom Jaya 11 unit berfoto, cabang, marketing, taxonomy)
+- PELAJARAN: restart sandbox menghapus .env (baris SUPER_ADMIN), DB, dan folder untracked — selalu cek .env & seed setelah restart container
