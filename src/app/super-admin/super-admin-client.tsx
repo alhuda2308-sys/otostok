@@ -179,8 +179,9 @@ export function SuperAdminClient() {
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error || 'Gagal memuat data lisensi.')
       }
-      const j = await res.json()
-      setRows(j.licenses)
+      // Parse aman: body kosong/non-JSON tidak boleh melempar "Unexpected end of JSON input"
+      const j = (await res.json().catch(() => ({}))) as { licenses?: SuperLicenseRow[] }
+      setRows(Array.isArray(j.licenses) ? j.licenses : [])
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal memuat data lisensi.')
     } finally {
@@ -325,9 +326,22 @@ export function SuperAdminClient() {
         await refetch()
         return
       }
-      const j = await res.json()
-      if (!res.ok) throw new Error(j.error || 'Gagal membuat lisensi.')
-      const license = { ...(j.license as SuperLicenseRow), showroom: null, usedUnits: 0, totalUnits: 0 }
+      // Parse aman — body kosong/non-JSON (mis. error platform/gateway) tetap
+      // menghasilkan pesan error yang jelas, bukan "Unexpected end of JSON input".
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string
+        license?: SuperLicenseRow
+      }
+      if (!res.ok) {
+        throw new Error(
+          j.error ||
+            (res.status === 405
+              ? 'Endpoint tidak tersedia di deployment ini — pastikan Vercel memakai commit terbaru.'
+              : `Gagal membuat lisensi. (HTTP ${res.status})`),
+        )
+      }
+      if (!j.license) throw new Error('Respons server tidak dikenal. Coba lagi.')
+      const license = { ...j.license, showroom: null, usedUnits: 0, totalUnits: 0 }
       setResult(license)
       toast.success(`Lisensi ${license.licenseKey} berhasil dibuat!`)
       await refetch()
@@ -351,8 +365,8 @@ export function SuperAdminClient() {
         await refetch()
         return
       }
-      const j = await res.json()
-      if (!res.ok) throw new Error(j.error || 'Aksi gagal.')
+      const j = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) throw new Error(j.error || `Aksi gagal. (HTTP ${res.status})`)
       if (action === 'extend') toast.success(`+30 hari — masa aktif kini ${expiryLabel(row)}`)
       if (action === 'suspend') toast.success(`${row.licenseKey} dibekukan (suspend).`)
       if (action === 'unsuspend') toast.success(`${row.licenseKey} dibuka kembali.`)

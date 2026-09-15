@@ -5,6 +5,7 @@ import {
   isSuperAuthorized,
   matchesSuperSecret,
 } from '@/lib/super-auth'
+import { dbErrorResponse } from '@/lib/db-errors'
 
 /**
  * Sesi Super Admin berbasis cookie HttpOnly (HMAC, 8 jam).
@@ -33,18 +34,33 @@ function cookieOptions() {
 
 /** GET: apakah sesi cookie/kunci saat ini valid? */
 export async function GET(req: Request) {
-  if (isSuperAuthorized(req)) return NextResponse.json({ ok: true })
-  return NextResponse.json({ ok: false }, { status: 401 })
+  try {
+    if (isSuperAuthorized(req)) return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: false }, { status: 401 })
+  } catch (e) {
+    return dbErrorResponse(e, 'session GET')
+  }
 }
 
 /** POST: verifikasi kunci → terbitkan cookie sesi. */
 export async function POST(req: Request) {
+  try {
+    return await sessionPost(req)
+  } catch (e) {
+    return dbErrorResponse(e, 'session POST')
+  }
+}
+
+async function sessionPost(req: Request): Promise<NextResponse> {
   const contentType = req.headers.get('content-type') ?? ''
   let key = ''
   let formMode = false
 
   if (contentType.includes('application/json')) {
-    const body = (await req.json().catch(() => ({}))) as { key?: unknown }
+    const parsed: unknown = await req.json().catch(() => ({}))
+    const body = (
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    ) as { key?: unknown }
     key = typeof body.key === 'string' ? body.key : ''
   } else {
     // application/x-www-form-urlencoded — jalur fallback form native
@@ -87,9 +103,13 @@ export async function POST(req: Request) {
 
 /** DELETE: logout — kosongkan cookie. */
 export async function DELETE() {
-  const res = NextResponse.json({ ok: true })
-  res.cookies.set(SA_COOKIE_NAME, '', { path: '/', maxAge: 0 })
-  return res
+  try {
+    const res = NextResponse.json({ ok: true })
+    res.cookies.set(SA_COOKIE_NAME, '', { path: '/', maxAge: 0 })
+    return res
+  } catch (e) {
+    return dbErrorResponse(e, 'session DELETE')
+  }
 }
 
 /** Redirect 303 kembali ke /super-admin (dengan/tanpa penanda error). */

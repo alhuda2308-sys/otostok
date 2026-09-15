@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "build": "bash scripts/prisma-generate.sh && next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
+    "postinstall": "bash scripts/prisma-generate.sh",
     "db:push": "prisma db push --accept-data-loss",
+    "db:push:pg": "prisma db push --accept-data-loss --schema prisma/schema.postgres.prisma",
     "db:generate": "prisma generate",
+    "db:generate:pg": "prisma generate --schema prisma/schema.postgres.prisma",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset"
   },

@@ -1,164 +1,214 @@
--- =====================================================================
--- OtoStok — Skema PostgreSQL / Supabase
--- =====================================================================
--- Versi produksi memakai Supabase (Postgres). Skema Prisma di proyek ini
--- identik secara struktur (lihat prisma/schema.prisma). Jalankan SQL ini
--- di Supabase SQL Editor bila ingin deploy database Postgres mandiri.
+-- ============================================================
+-- OtoStok — Migrasi skema untuk Supabase (PostgreSQL)
+-- ============================================================
+-- Cara pakai:
+--   1. Buka Supabase Dashboard → SQL Editor
+--   2. Copy-paste SELURUH isi file ini → Run
+--   3. Selesai — semua tabel siap dipakai aplikasi
 --
--- Catatan keamanan:
---   * base_price (harga modal) ada di tabel vehicles dan TIDAK PERNAH
---     dikembalikan oleh endpoint katalog publik.
---   * Contoh RLS: aktifkan Row Level Security dan beri akses tabel hanya
---     ke service_role / role backend, lalu buat VIEW katalog_publik
---     tanpa kolom base_price untuk akses anonim.
--- =====================================================================
+-- CATATAN:
+--   • Jalankan pada database Supabase yang MASIH KOSONG (sekali saja).
+--     Bila sudah pernah dijalankan, tabel akan dilaporkan "already exists"
+--     — itu berarti skema sudah ada, abaikan/skip.
+--   • Skema ini di-generate dari prisma/schema.postgres.prisma
+--     (sumber kebenaran model aplikasi).
+--   • Setelah ini, set env Vercel: DATABASE_URL (connection string
+--     Postgres Supabase) + SUPER_ADMIN_SECRET, lalu redeploy.
+--
+-- Tabel: licenses, showrooms, staff_accounts, branches, taxonomies,
+--        vehicles, marketings, bookings
+-- ============================================================
 
-create table if not exists licenses (
-  id            uuid primary key default gen_random_uuid(),
-  license_key   text not null unique,               -- format MTR-XXXX-XXXX
-  plan_type     text not null default 'trial',      -- trial | monthly | lifetime
-  max_vehicles  integer not null default 10,
-  status        text not null default 'active',     -- active | expired
-  expires_at    timestamptz,                        -- null = lifetime
-  created_at    timestamptz not null default now()
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
+-- CreateTable
+CREATE TABLE "licenses" (
+    "id" TEXT NOT NULL,
+    "license_key" TEXT NOT NULL,
+    "plan_type" TEXT NOT NULL,
+    "max_vehicles" INTEGER NOT NULL DEFAULT 10,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "expires_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "licenses_pkey" PRIMARY KEY ("id")
 );
 
-create table if not exists showrooms (
-  id            uuid primary key default gen_random_uuid(),
-  license_id    uuid not null unique references licenses (id) on delete cascade,
-  name          text not null,
-  slug          text not null unique,               -- contoh: showroom-jaya
-  owner_phone   text not null,
-  address       text not null,
-  logo_url      text,                               -- logo showroom (katalog publik)
-  header_url    text,                               -- foto header/banner katalog
-  maps_url      text,                               -- link Google Maps lokasi
-  is_active     boolean not null default true,
-  created_at    timestamptz not null default now()
+-- CreateTable
+CREATE TABLE "showrooms" (
+    "id" TEXT NOT NULL,
+    "license_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "owner_phone" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "logo_url" TEXT,
+    "header_url" TEXT,
+    "maps_url" TEXT,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "showrooms_pkey" PRIMARY KEY ("id")
 );
 
--- Akun login dashboard (owner = kendali penuh, admin = staf terbatas)
-create table if not exists staff_accounts (
-  id            uuid primary key default gen_random_uuid(),
-  showroom_id   uuid not null references showrooms (id) on delete cascade,
-  name          text not null,
-  username      text not null,
-  password_hash text not null,                      -- scrypt: salt:hex
-  role          text not null default 'admin',      -- owner | admin
-  is_active     boolean not null default true,
-  created_at    timestamptz not null default now(),
-  unique (showroom_id, username)
+-- CreateTable
+CREATE TABLE "staff_accounts" (
+    "id" TEXT NOT NULL,
+    "showroom_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "username" TEXT NOT NULL,
+    "password_hash" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'admin',
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "staff_accounts_pkey" PRIMARY KEY ("id")
 );
 
--- Kategori & merek custom per showroom (tidak di-hardcode)
-create table if not exists taxonomies (
-  id            uuid primary key default gen_random_uuid(),
-  showroom_id   uuid not null references showrooms (id) on delete cascade,
-  kind          text not null,                      -- category | brand
-  name          text not null,
-  created_at    timestamptz not null default now(),
-  unique (showroom_id, kind, name)
+-- CreateTable
+CREATE TABLE "branches" (
+    "id" TEXT NOT NULL,
+    "showroom_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "maps_url" TEXT,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "branches_pkey" PRIMARY KEY ("id")
 );
 
--- Cabang showroom (lokasi unit dinamis).
--- Tanpa cabang = showroom hanya punya 1 lokasi (lokasi utama).
-create table if not exists branches (
-  id          uuid primary key default gen_random_uuid(),
-  showroom_id uuid not null references showrooms (id) on delete cascade,
-  name        text not null,                      -- cth: Cabang Bekasi
-  address     text not null,
-  maps_url    text,                               -- link Google Maps cabang
-  is_active   boolean not null default true,
-  created_at  timestamptz not null default now(),
-  unique (showroom_id, name)
+-- CreateTable
+CREATE TABLE "taxonomies" (
+    "id" TEXT NOT NULL,
+    "showroom_id" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "taxonomies_pkey" PRIMARY KEY ("id")
 );
 
-create table if not exists vehicles (
-  id                uuid primary key default gen_random_uuid(),
-  showroom_id       uuid not null references showrooms (id) on delete cascade,
-  branch_id         uuid references branches (id) on delete set null, -- null = lokasi utama
-  brand             text not null,
-  model             text not null,
-  category          text,                           -- Matic, Bebek, Sport, dst (dari taxonomies)
-  year              integer not null,
-  license_plate     text not null,
-  color             text,
-  odometer          integer,                        -- KM
-  tax_status        text,                           -- cth: "Hidup s/d 03/2026"
-  document_status   text,                           -- cth: "STNK & BPKB Lengkap"
-  base_price        bigint,                         -- SENSITIF: harga modal, hanya owner
-  selling_price     bigint,                         -- harga jual showroom
-  commission_amount bigint,                         -- komisi marketing nominal fix (Rp)
-  status            text not null default 'available', -- available | hold | sold
-  photos            jsonb not null default '[]'::jsonb, -- array URL foto
-  notes             text,
-  -- mutasi unit masuk
-  purchased_at      timestamptz,                    -- tanggal masuk (default created_at)
-  arrival_notes     text,                           -- kondisi fisik saat datang
-  arrival_photos    jsonb not null default '[]'::jsonb,
-  -- mutasi unit keluar / penjualan
-  sold_at           timestamptz,                    -- tanggal laku
-  sold_price        bigint,                         -- harga deal akhir
-  sold_by           text,                           -- nama marketing yang tembus
-  handover_photo    text,                           -- foto bukti serah terima (opsional)
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
+-- CreateTable
+CREATE TABLE "vehicles" (
+    "id" TEXT NOT NULL,
+    "showroom_id" TEXT NOT NULL,
+    "brand" TEXT NOT NULL,
+    "model" TEXT NOT NULL,
+    "category" TEXT,
+    "year" INTEGER NOT NULL,
+    "license_plate" TEXT NOT NULL,
+    "color" TEXT,
+    "odometer" INTEGER,
+    "tax_status" TEXT,
+    "document_status" TEXT,
+    "base_price" INTEGER,
+    "selling_price" INTEGER,
+    "commission_amount" INTEGER,
+    "status" TEXT NOT NULL DEFAULT 'available',
+    "photos" TEXT NOT NULL DEFAULT '[]',
+    "notes" TEXT,
+    "purchased_at" TIMESTAMP(3),
+    "arrival_notes" TEXT,
+    "arrival_photos" TEXT DEFAULT '[]',
+    "sold_at" TIMESTAMP(3),
+    "sold_price" INTEGER,
+    "sold_by" TEXT,
+    "handover_photo" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "branch_id" TEXT,
+
+    CONSTRAINT "vehicles_pkey" PRIMARY KEY ("id")
 );
 
-create index if not exists vehicles_showroom_status_idx on vehicles (showroom_id, status);
-create index if not exists vehicles_branch_idx on vehicles (branch_id);
+-- CreateTable
+CREATE TABLE "marketings" (
+    "id" TEXT NOT NULL,
+    "showroom_id" TEXT NOT NULL,
+    "full_name" TEXT NOT NULL,
+    "phone_number" TEXT NOT NULL,
+    "address_city" TEXT NOT NULL,
+    "ktp_photo_url" TEXT,
+    "notes" TEXT,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
--- Rekanan marketing terdaftar (Whitelist Nomor WhatsApp).
--- Nomor di sini satu-satunya yang bisa membuka katalog publik
--- (bila showroom sudah mendaftarkan minimal 1 rekanan).
-create table if not exists marketings (
-  id            uuid primary key default gen_random_uuid(),
-  showroom_id   uuid not null references showrooms (id) on delete cascade,
-  full_name     text not null,
-  phone_number  text not null,                      -- format lokal 08xxx, unik per showroom
-  address_city  text not null,                      -- domisili / kota asal
-  ktp_photo_url text,                               -- opsional, dilayani via API aman (bukan file publik)
-  notes         text,                               -- catatan khusus owner
-  is_active     boolean not null default true,
-  created_at    timestamptz not null default now(),
-  unique (showroom_id, phone_number)
+    CONSTRAINT "marketings_pkey" PRIMARY KEY ("id")
 );
 
-create table if not exists bookings (
-  id              uuid primary key default gen_random_uuid(),
-  vehicle_id      uuid not null references vehicles (id) on delete cascade,
-  marketing_id    uuid references marketings (id) on delete set null, -- null = hold manual tanpa rekanan
-  marketing_name  text not null,                    -- denormalisasi (riwayat tetap ada walau rekanan dihapus)
-  marketing_phone text not null,
-  status          text not null default 'hold',     -- hold | confirmed | expired
-  expires_at      timestamptz not null,             -- hold otomatis 2 jam
-  created_at      timestamptz not null default now()
+-- CreateTable
+CREATE TABLE "bookings" (
+    "id" TEXT NOT NULL,
+    "vehicle_id" TEXT NOT NULL,
+    "marketing_id" TEXT,
+    "marketing_name" TEXT NOT NULL,
+    "marketing_phone" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'hold',
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "bookings_pkey" PRIMARY KEY ("id")
 );
 
-create index if not exists bookings_vehicle_status_idx on bookings (vehicle_id, status);
-create index if not exists bookings_marketing_idx on bookings (marketing_id);
+-- CreateIndex
+CREATE UNIQUE INDEX "licenses_license_key_key" ON "licenses"("license_key");
 
--- Trigger updated_at untuk vehicles
-create or replace function set_updated_at() returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$ language plpgsql;
+-- CreateIndex
+CREATE UNIQUE INDEX "showrooms_license_id_key" ON "showrooms"("license_id");
 
-drop trigger if exists vehicles_set_updated_at on vehicles;
-create trigger vehicles_set_updated_at
-  before update on vehicles
-  for each row execute function set_updated_at();
+-- CreateIndex
+CREATE UNIQUE INDEX "showrooms_slug_key" ON "showrooms"("slug");
 
--- =====================================================================
--- VIEW publik untuk katalog marketing (tanpa harga modal & data mutasi internal)
--- =====================================================================
-create or replace view katalog_publik as
-select
-  v.id, v.showroom_id, v.branch_id, b.name as branch_name, v.brand, v.model, v.category,
-  v.year, v.license_plate, v.color,
-  v.odometer, v.tax_status, v.document_status, v.selling_price,
-  v.commission_amount, v.status, v.photos, v.notes, v.updated_at
-from vehicles v
-left join branches b on b.id = v.branch_id;
+-- CreateIndex
+CREATE UNIQUE INDEX "staff_accounts_showroom_id_username_key" ON "staff_accounts"("showroom_id", "username");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "branches_showroom_id_name_key" ON "branches"("showroom_id", "name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "taxonomies_showroom_id_kind_name_key" ON "taxonomies"("showroom_id", "kind", "name");
+
+-- CreateIndex
+CREATE INDEX "vehicles_showroom_id_status_idx" ON "vehicles"("showroom_id", "status");
+
+-- CreateIndex
+CREATE INDEX "vehicles_branch_id_idx" ON "vehicles"("branch_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "marketings_showroom_id_phone_number_key" ON "marketings"("showroom_id", "phone_number");
+
+-- CreateIndex
+CREATE INDEX "bookings_vehicle_id_status_idx" ON "bookings"("vehicle_id", "status");
+
+-- CreateIndex
+CREATE INDEX "bookings_marketing_id_idx" ON "bookings"("marketing_id");
+
+-- AddForeignKey
+ALTER TABLE "showrooms" ADD CONSTRAINT "showrooms_license_id_fkey" FOREIGN KEY ("license_id") REFERENCES "licenses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "staff_accounts" ADD CONSTRAINT "staff_accounts_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "branches" ADD CONSTRAINT "branches_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "taxonomies" ADD CONSTRAINT "taxonomies_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "vehicles" ADD CONSTRAINT "vehicles_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "vehicles" ADD CONSTRAINT "vehicles_branch_id_fkey" FOREIGN KEY ("branch_id") REFERENCES "branches"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "marketings" ADD CONSTRAINT "marketings_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_vehicle_id_fkey" FOREIGN KEY ("vehicle_id") REFERENCES "vehicles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_marketing_id_fkey" FOREIGN KEY ("marketing_id") REFERENCES "marketings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+

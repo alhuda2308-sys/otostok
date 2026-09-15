@@ -1,14 +1,17 @@
-// OtoStok — Skema database manajemen stok showroom motor bekas (SQLite, lokal)
-// Versi produksi Supabase/PostgreSQL: prisma/schema.postgres.prisma (model
-// identik). scripts/prisma-generate.sh memilih schema otomatis sesuai
-// DATABASE_URL. Migrasi SQL siap-jalankan: supabase/schema.sql
+// OtoStok — Skema PRODUKSI untuk Supabase/Postgres (deploy Vercel).
+// Varian dari prisma/schema.prisma (lokal = SQLite). Model identik — hanya
+// provider yang berbeda. Dipakai otomatis oleh scripts/prisma-generate.sh
+// saat DATABASE_URL berawalan postgres:// / postgresql:// (mis. di Vercel).
+//
+// Membuat tabel di Supabase: jalankan supabase/schema.sql di Supabase SQL
+// Editor, ATAU `bun run db:push:pg` dengan DATABASE_URL Postgres.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -41,7 +44,7 @@ model Showroom {
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  license    License       @relation(fields: [licenseId], references: [id])
+  license    License        @relation(fields: [licenseId], references: [id])
   vehicles   Vehicle[]
   staff      StaffAccount[]
   taxonomies Taxonomy[]
@@ -80,7 +83,7 @@ model Branch {
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  showroom Showroom @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+  showroom Showroom  @relation(fields: [showroomId], references: [id], onDelete: Cascade)
   vehicles Vehicle[]
 
   @@unique([showroomId, name])
@@ -157,7 +160,7 @@ model Marketing {
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  showroom Showroom @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+  showroom Showroom  @relation(fields: [showroomId], references: [id], onDelete: Cascade)
   bookings Booking[]
 
   @@unique([showroomId, phoneNumber])

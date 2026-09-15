@@ -299,3 +299,25 @@ Stage Summary:
 - 修复模式：Cookie 会话（HttpOnly + HMAC 签名 + 8h TTL）为主认证，原生表单 POST 为 fetch 被阻断时的兜底；请求中不再出现 "secret" 关键词（字段改名为 key）
 - 教训：沙箱 preview 的外部代理层不可见不可控，跨代理认证必须使用 Cookie 等最标准机制；诊断时须先确认日志中请求是否到达，再归因
 - E2E 覆盖：JSON 登录、表单回退登录、Cookie 数据加载、生成/暂停/恢复、登出，全部经真实网关验证
+
+---
+Task ID: vercel-json-error-fix
+Agent: Z.ai Code (orchestrator)
+Task: 修复 Vercel 部署 (otostok-showroom.vercel.app) 上 Generate Lisensi 报 "Unexpected end of JSON input"
+
+Work Log:
+- 定性：该错误 = 客户端在空响应体上调 res.json()；POST handler 的客户端代码先 res.json() 后检查 res.ok，服务器/平台 5xx 空响应时直接崩溃
+- 新建 src/lib/db-errors.ts：dbErrorResponse（记录完整错误到服务器日志 → Vercel Runtime Logs 可见）+ Prisma 错误映射（P2021 表不存在/P2022 列不匹配/P1000 认证失败/P1001 连不上/P2002 唯一冲突/P2003 外键，全部印尼语可操作提示）+ safeJsonBody（null/数组/非法 JSON 一律归一为 {}）
+- licenses 路由：GET/POST/PATCH 全部 try-catch 包裹，任何异常返回 JSON（永不空体/HTML）
+- session 路由：同样 try-catch + 修复 body=null 边界
+- 客户端 super-admin-client：refetch/handleGenerate/handleAction 全部安全解析（res.json().catch + 校验字段），错误信息带 HTTP 状态码，405 有专门提示（部署版本过旧）
+- Supabase 支持：新建 prisma/schema.postgres.prisma（模型与 SQLite 版一致）；用 prisma migrate diff 生成规范 DDL supabase/schema.sql（8 表+索引+外键，附使用说明头）；package.json 增加 db:push:pg / db:generate:pg
+- 构建接线：scripts/prisma-generate.sh 按 DATABASE_URL 协议自动选 schema（postgres://→postgres schema，否则 sqlite）；接入 build 与 postinstall；本地验证选型正确
+- 文档：.env.example 增加 Supabase 连接串示例 + 说明 SUPABASE_SERVICE_ROLE_KEY 非必需；README 增加 "Deploy ke Vercel + Supabase" 完整步骤与错误诊断表
+- 测试（真实复现故障）：备份 DB → 临时重命名 licenses 表 → 主服务器上 POST/GET/PATCH 全部返回 500+清晰 JSON（"Tabel database belum dibuat. Jalankan migrasi: SQL di supabase/schema.sql..."），非法 JSON body 与 null body 返回 400 JSON 不崩溃 → 恢复表 → 数据完整
+- E2E（agent-browser 过网关 :81）：登录→生成 OTO-9N36-RE72-N7DU→Suspend→Unsuspend→登出 全通过；测试许可证已删除
+
+Stage Summary:
+- 用户在 Vercel 遇到的故障最可能根因：Supabase Postgres + SQLite 版 Prisma Client 不匹配 / 表未创建 → 所有 DB 查询 5xx，POST 路径暴露为神秘的 JSON 解析错误
+- 现在两层防护：服务器任何失败都返回带修复指引的 JSON；客户端永不裸调 res.json()
+- Supabase 上线三步：SQL Editor 跑 supabase/schema.sql → Vercel 设 DATABASE_URL(pooled 6543 + pgbouncer=true) 与 SUPER_ADMIN_SECRET → redeploy（构建自动生成 Postgres client）
