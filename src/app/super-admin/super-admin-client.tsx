@@ -166,8 +166,9 @@ export function SuperAdminClient() {
       if (!key) return
       setRefreshing(true)
       try {
-        const res = await fetch('/api/super-admin/licenses', {
-          headers: { 'X-Super-Secret': key },
+        // Kirim kunci via query param (BUKAN header custom) — header X-* dapat
+        // dibuang oleh reverse proxy/gateway sehingga request selalu ditolak 401.
+        const res = await fetch(`/api/super-admin/licenses?secret=${encodeURIComponent(key)}`, {
           cache: 'no-store',
         })
         if (res.status === 401) {
@@ -198,10 +199,11 @@ export function SuperAdminClient() {
     setChecking(true)
     setAuthError(null)
     try {
-      const res = await fetch('/api/super-admin/licenses', {
-        headers: { 'X-Super-Secret': secret },
-        cache: 'no-store',
-      })
+      // Kunci via query param — lihat catatan refetch() mengenai gateway.
+      const res = await fetch(
+        `/api/super-admin/licenses?secret=${encodeURIComponent(secret)}`,
+        { cache: 'no-store' },
+      )
       if (res.status === 401) {
         setAuthError('Master Secret Key salah.')
         sessionStorage.removeItem(SESSION_KEY)
@@ -209,7 +211,7 @@ export function SuperAdminClient() {
       }
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal verifikasi kunci.')
+        throw new Error(j.error || `Gagal verifikasi kunci. (HTTP ${res.status})`)
       }
       const j = await res.json()
       secretRef.current = secret
@@ -218,7 +220,12 @@ export function SuperAdminClient() {
       setPhase('ready')
       setPasskey('')
     } catch (e) {
-      setAuthError(e instanceof Error ? e.message : 'Gagal verifikasi kunci.')
+      if (e instanceof TypeError) {
+        // fetch gagal di level jaringan (gateway/proxy memutus koneksi)
+        setAuthError('Tidak dapat menghubungi server. Muat ulang halaman lalu coba lagi.')
+      } else {
+        setAuthError(e instanceof Error ? e.message : 'Gagal verifikasi kunci.')
+      }
     } finally {
       setChecking(false)
     }
@@ -259,14 +266,14 @@ export function SuperAdminClient() {
     }
     setGenerating(true)
     try {
-      const res = await fetch('/api/super-admin/licenses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Super-Secret': secretRef.current ?? '',
+      const res = await fetch(
+        `/api/super-admin/licenses?secret=${encodeURIComponent(secretRef.current ?? '')}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planType, maxVehicles: quota }),
         },
-        body: JSON.stringify({ planType, maxVehicles: quota }),
-      })
+      )
       if (res.status === 401) {
         await refetch()
         return
@@ -288,14 +295,14 @@ export function SuperAdminClient() {
   async function handleAction(row: SuperLicenseRow, action: 'extend' | 'suspend' | 'unsuspend') {
     setBusyId(`${row.id}-${action}`)
     try {
-      const res = await fetch('/api/super-admin/licenses', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Super-Secret': secretRef.current ?? '',
+      const res = await fetch(
+        `/api/super-admin/licenses?secret=${encodeURIComponent(secretRef.current ?? '')}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: row.id, action }),
         },
-        body: JSON.stringify({ id: row.id, action }),
-      })
+      )
       if (res.status === 401) {
         await refetch()
         return
