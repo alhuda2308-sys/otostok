@@ -43,8 +43,28 @@ const DEFAULT_BRANDS = ['Honda', 'Yamaha', 'Suzuki', 'Kawasaki', 'Vespa']
 async function main() {
   const now = new Date()
   const images = loadVehicleImages()
-  const photos = (slug: string, extra: string[] = []): string =>
-    JSON.stringify([...(images[slug] ?? []), ...extra])
+
+  // Fallback foto demo: bila mapping agent-ctx/vehicle-images.json hilang
+  // (mis. setelah reset sandbox), gunakan file foto lokal di public/uploads
+  // dan bagikan merata (2 foto per unit, round-robin) agar katalog tetap hidup.
+  const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
+  const fallbackPool = fs.existsSync(uploadsDir)
+    ? fs
+        .readdirSync(uploadsDir)
+        .filter((f) => /\.(jpe?g|png|webp)$/i.test(f))
+        .sort()
+        .map((f) => `/uploads/${f}`)
+    : []
+  let fallbackCursor = 0
+  const photos = (slug: string, extra: string[] = []): string => {
+    const mapped = images[slug] ?? []
+    if (mapped.length === 0 && fallbackPool.length > 0) {
+      const picks = [0, 1].map((k) => fallbackPool[(fallbackCursor + k) % fallbackPool.length])
+      fallbackCursor = (fallbackCursor + 2) % fallbackPool.length
+      return JSON.stringify([...picks, ...extra])
+    }
+    return JSON.stringify([...mapped, ...extra])
+  }
 
   // ============ LICENSES ============
   const licJaya = await db.license.upsert({
