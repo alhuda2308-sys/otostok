@@ -321,3 +321,31 @@ Stage Summary:
 - 用户在 Vercel 遇到的故障最可能根因：Supabase Postgres + SQLite 版 Prisma Client 不匹配 / 表未创建 → 所有 DB 查询 5xx，POST 路径暴露为神秘的 JSON 解析错误
 - 现在两层防护：服务器任何失败都返回带修复指引的 JSON；客户端永不裸调 res.json()
 - Supabase 上线三步：SQL Editor 跑 supabase/schema.sql → Vercel 设 DATABASE_URL(pooled 6543 + pgbouncer=true) 与 SUPER_ADMIN_SECRET → redeploy（构建自动生成 Postgres client）
+
+---
+Task ID: vercel-error-transparency
+Agent: Z.ai Code (main)
+Task: Ubah respons error handler API licenses (POST & GET) agar menampilkan pesan error asli Prisma langsung ke layar ({ error: err.message, code: err.code }), bukan pesan generik "Terjadi kesalahan server"; lalu push ke main agar ter-deploy ke Vercel.
+
+Work Log:
+- Diagnosa: pesan "Terjadi kesalahan server (licenses POST). Detail ada di log server." berasal dari cabang fallback dbErrorResponse() di src/lib/db-errors.ts — artinya try-catch + JSON-guarantee sebelumnya BEKERJA (bukan lagi "Unexpected end of JSON input"), tetapi error aktual TIDAK terpetakan ke kode Prisma yang dikenal sehingga jatuh ke pesan generik
+- src/lib/db-errors.ts — dbErrorResponse() ditulis ulang (mode diagnosa):
+  - Error tak-terpetakan → payload { error: <pesan ASLI err.message>, code: err.code ?? 'UNKNOWN', context } status 500
+  - Kode Prisma terkenal (P1000/P1001/P2021/P2022/P2002/P2003) tetap dipetakan ke pesan ramah bahasa Indonesia, tetapi payload kini menyertakan code + detail (pesan asli) + context — tidak ada informasi yang disembunyikan
+  - Kasus khusus "@prisma/client did not initialize yet" juga disertai code + detail
+  - Error tanpa pesan → fallback aman "Error tidak dikenal (tanpa pesan)." tanpa crash
+  - console.error detail lengkap tetap dicatat (Vercel Runtime Logs / dev.log)
+- src/app/super-admin/super-admin-client.tsx:
+  - Interface baru ApiErrorPayload { error?, code?, detail? } + helper formatApiError() — merakit "[CODE] pesan — detail asli" utk toast
+  - Dipakai di 3 titik: refetch (GET), handleGenerate (POST), handleAction (PATCH) — kode Prisma + pesan asli kini tampil di layar, bukan hanya di log
+- Verifikasi:
+  - bun run lint → bersih
+  - Uji dbErrorResponse langsung dgn 4 simulasi: P9999 tak-terpetakan → 500 {error: pesan asli, code}; P2021 → 500 pesan ramah + code + detail; error kosong → fallback aman; P1001 → 503 + code + detail — semua JSON valid
+  - curl E2E lokal: login sesi 200 → GET licenses 200 → POST generate 201 (happy path tak terganggu)
+  - agent-browser E2E: login → dashboard render → klik "Generate Lisensi" → lisensi OTO-KG3N-4DMY-QNSR sukses dibuat, toast + kartu + tabel ter-refresh; console 0 error; dev.log bersih
+- Git: commit e2416e0 "feat(super-admin): tampilkan error asli Prisma di layar (mode diagnosa)" → push origin main BERHASIL (79f97b7..e2416e0) — Vercel auto-deploy terpicu
+
+Stage Summary:
+- Layar /super-admin Vercel tidak akan lagi menampilkan "Terjadi kesalahan server" — pengguna akan melihat pesan Prisma asli + kode (mis. "[P2021] Tabel database belum dibuat..." atau pesan provider/kredensial apa pun), memungkinkan diagnosa produksi langsung dari UI
+- Prediksi error yang akan terlihat di Vercel setelah deploy ini: (a) P2021 → jalankan supabase/schema.sql di SQL Editor; (b) P1001/P1000 → DATABASE_URL salah; (c) pesan "the URL must start with protocol 'file:'" → Prisma Client SQLite dipakai di serverless, pastikan DATABASE_URL postgres:// agar build memilih schema.postgres.prisma (scripts/prisma-generate.sh)
+- Catatan keamanan: detail error teknis ekspos ke klien hanya di endpoint Super Admin (terlindungi Master Secret Key / cookie sesi) — disengaja utk mode diagnosa produksi
