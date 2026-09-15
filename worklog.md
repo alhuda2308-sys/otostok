@@ -222,3 +222,21 @@ Work Log:
 Stage Summary:
 - Modul Super Admin berfungsi normal; Master Key aktif: otostok_sa_c346a161b047c5e756f58bbe (dari .env)
 - Solusi untuk user: salin-tempel kunci persis tanpa spasi
+
+---
+Task ID: super-admin-gateway-header-fix
+Agent: main (Z.ai Code)
+Task: Perbaiki login /super-admin yang selalu gagal walau kunci benar
+
+Work Log:
+- Screenshot user menampilkan "Gagal verifikasi kunci." (bukan 401) dan dev.log TIDAK mencatat request kedua user → indikasi request hilang di gateway
+- Tes pembanding: langsung :3000 + header X-Super-Secret → 200; via Caddy :81 + header yang sama → 401 (HEADER DIBUANG GATEWAY); via :81 + ?secret= → 200
+- Kesimpulan: akar masalah = Caddy/gateway membuang custom header X-*, bukan salah ketik user (diagnosa awal yang menuduh kunci salah TIDAK TEPAT)
+- Fix super-admin-client.tsx: keempat fetch (verifyAndLoad, refetch, handleGenerate POST, handleAction PATCH) kini kirim kunci via query param ?secret= (API memang sudah mendukung); header custom dihapus total
+- Pesan error kini menyertakan kode HTTP (mis. "Gagal verifikasi kunci. (HTTP 502)") + pesan khusus TypeError jaringan
+- E2E via jalur gateway asli (localhost:81, sama seperti preview user): login sukses, generate lisensi OTO-B57Q-Z3PB-A46W sukses (201), suspend→unsuspend sukses (200)
+- Lint bersih; push ke GitHub (5a46854); lisensi tes dikembalikan ke status active
+
+Stage Summary:
+- Login /super-admin kini berfungsi lewat preview/gateway: kunci dikirim sebagai ?secret= yang tidak mungkin dibuang proxy
+- Pelajaran penting: JANGAN andalkan custom header X-* untuk auth request yang melewati Caddy gateway proyek ini — gunakan query param
