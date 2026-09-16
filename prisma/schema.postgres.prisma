@@ -3,6 +3,11 @@
 // provider yang berbeda. Dipakai otomatis oleh scripts/prisma-generate.sh
 // saat DATABASE_URL berawalan postgres:// / postgresql:// (mis. di Vercel).
 //
+// ID: @default(uuid()) + @db.Uuid — Prisma generate UUIDv4 valid di sisi
+// client utk SETIAP create (cocok dgn kolom UUID di database Supabase).
+// JANGAN pakai @default(cuid()) di schema ini — string cuid (mis. "cm...")
+// ditolak kolom UUID (error P2023 "Inconsistent column data").
+//
 // Membuat tabel di Supabase: jalankan supabase/schema.sql di Supabase SQL
 // Editor, ATAU `bun run db:push:pg` dengan DATABASE_URL Postgres.
 
@@ -17,7 +22,7 @@ datasource db {
 
 // Lisensi aktivasi software (distribusi mandiri)
 model License {
-  id          String    @id @default(cuid())
+  id          String    @id @default(uuid()) @db.Uuid
   licenseKey  String    @unique @map("license_key") // format MTR-XXXX-XXXX
   planType    String    @map("plan_type") // trial | monthly | lifetime
   maxVehicles Int       @default(10) @map("max_vehicles")
@@ -32,8 +37,8 @@ model License {
 
 // Showroom terikat 1:1 ke lisensi
 model Showroom {
-  id         String   @id @default(cuid())
-  licenseId  String   @unique @map("license_id")
+  id         String   @id @default(uuid()) @db.Uuid
+  licenseId  String   @unique @map("license_id") @db.Uuid
   name       String
   slug       String   @unique // contoh: showroom-jaya
   ownerPhone String   @map("owner_phone")
@@ -56,8 +61,8 @@ model Showroom {
 
 // Akun login dashboard (owner = kendali penuh, admin = staf terbatas)
 model StaffAccount {
-  id           String   @id @default(cuid())
-  showroomId   String   @map("showroom_id")
+  id           String   @id @default(uuid()) @db.Uuid
+  showroomId   String   @map("showroom_id") @db.Uuid
   name         String
   username     String // unik per showroom
   passwordHash String   @map("password_hash") // scrypt: salt:hex
@@ -75,8 +80,8 @@ model StaffAccount {
 // Tanpa cabang = showroom hanya punya 1 lokasi (lokasi utama) —
 // UI otomatis menyembunyikan dropdown & filter lokasi.
 model Branch {
-  id         String   @id @default(cuid())
-  showroomId String   @map("showroom_id")
+  id         String   @id @default(uuid()) @db.Uuid
+  showroomId String   @map("showroom_id") @db.Uuid
   name       String // cth: Cabang Bekasi
   address    String
   mapsUrl    String?  @map("maps_url") // link Google Maps cabang
@@ -92,8 +97,8 @@ model Branch {
 
 // Kategori & merek custom per showroom (tidak di-hardcode)
 model Taxonomy {
-  id         String   @id @default(cuid())
-  showroomId String   @map("showroom_id")
+  id         String   @id @default(uuid()) @db.Uuid
+  showroomId String   @map("showroom_id") @db.Uuid
   kind       String // category | brand
   name       String
   createdAt  DateTime @default(now()) @map("created_at")
@@ -107,8 +112,8 @@ model Taxonomy {
 // Unit motor bekas. base_price SENSITIF (hanya owner).
 // photos disimpan sebagai JSON array of string (portable SQLite/Postgres).
 model Vehicle {
-  id               String    @id @default(cuid())
-  showroomId       String    @map("showroom_id")
+  id               String    @id @default(uuid()) @db.Uuid
+  showroomId       String    @map("showroom_id") @db.Uuid
   brand            String // Honda, Yamaha, Suzuki, dst (dari taxonomy showroom)
   model            String // Beat 110 CBS, NMAX 155, dst
   category         String? // Matic, Bebek, Sport, dst (dari taxonomy showroom)
@@ -135,7 +140,7 @@ model Vehicle {
   handoverPhoto    String?   @map("handover_photo") // foto bukti serah terima (opsional)
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
-  branchId         String?   @map("branch_id") // null = lokasi utama showroom
+  branchId         String?   @map("branch_id") @db.Uuid // null = lokasi utama showroom
 
   showroom Showroom  @relation(fields: [showroomId], references: [id], onDelete: Cascade)
   branch   Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -150,8 +155,8 @@ model Vehicle {
 // Nomor yang ada di sini satu-satunya yang bisa membuka katalog publik
 // (bila showroom sudah mendaftarkan minimal 1 rekanan).
 model Marketing {
-  id          String   @id @default(cuid())
-  showroomId  String   @map("showroom_id")
+  id          String   @id @default(uuid()) @db.Uuid
+  showroomId  String   @map("showroom_id") @db.Uuid
   fullName    String   @map("full_name")
   phoneNumber String   @map("phone_number") // format lokal 08xxx, unik per showroom
   addressCity String   @map("address_city") // domisili / kota asal
@@ -171,9 +176,9 @@ model Marketing {
 // marketingName/phone tetap disimpan denormalisasi agar riwayat tidak hilang
 // saat data rekanan diedit/dihapus.
 model Booking {
-  id             String   @id @default(cuid())
-  vehicleId      String   @map("vehicle_id")
-  marketingId    String?  @map("marketing_id") // null = hold manual tanpa akun rekanan
+  id             String   @id @default(uuid()) @db.Uuid
+  vehicleId      String   @map("vehicle_id") @db.Uuid
+  marketingId    String?  @map("marketing_id") @db.Uuid // null = hold manual tanpa akun rekanan
   marketingName  String   @map("marketing_name")
   marketingPhone String   @map("marketing_phone")
   status         String   @default("hold") // hold | confirmed | expired

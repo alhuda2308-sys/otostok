@@ -12,6 +12,8 @@
 --     — itu berarti skema sudah ada, abaikan/skip.
 --   • Skema ini di-generate dari prisma/schema.postgres.prisma
 --     (sumber kebenaran model aplikasi).
+--   • Semua kolom ID & FK bertipe UUID — aplikasi (Prisma) mengisi
+--     UUIDv4 sendiri via @default(uuid()), cocok dgn konvensi Supabase.
 --   • Setelah ini, set env Vercel: DATABASE_URL (connection string
 --     Postgres Supabase) + SUPER_ADMIN_SECRET, lalu redeploy.
 --
@@ -19,12 +21,13 @@
 --        vehicles, marketings, bookings
 -- ============================================================
 
+
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateTable
 CREATE TABLE "licenses" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
     "license_key" TEXT NOT NULL,
     "plan_type" TEXT NOT NULL,
     "max_vehicles" INTEGER NOT NULL DEFAULT 10,
@@ -37,8 +40,8 @@ CREATE TABLE "licenses" (
 
 -- CreateTable
 CREATE TABLE "showrooms" (
-    "id" TEXT NOT NULL,
-    "license_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "license_id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "owner_phone" TEXT NOT NULL,
@@ -54,8 +57,8 @@ CREATE TABLE "showrooms" (
 
 -- CreateTable
 CREATE TABLE "staff_accounts" (
-    "id" TEXT NOT NULL,
-    "showroom_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "showroom_id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "password_hash" TEXT NOT NULL,
@@ -68,8 +71,8 @@ CREATE TABLE "staff_accounts" (
 
 -- CreateTable
 CREATE TABLE "branches" (
-    "id" TEXT NOT NULL,
-    "showroom_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "showroom_id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "address" TEXT NOT NULL,
     "maps_url" TEXT,
@@ -81,8 +84,8 @@ CREATE TABLE "branches" (
 
 -- CreateTable
 CREATE TABLE "taxonomies" (
-    "id" TEXT NOT NULL,
-    "showroom_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "showroom_id" UUID NOT NULL,
     "kind" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -92,8 +95,8 @@ CREATE TABLE "taxonomies" (
 
 -- CreateTable
 CREATE TABLE "vehicles" (
-    "id" TEXT NOT NULL,
-    "showroom_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "showroom_id" UUID NOT NULL,
     "brand" TEXT NOT NULL,
     "model" TEXT NOT NULL,
     "category" TEXT,
@@ -118,15 +121,15 @@ CREATE TABLE "vehicles" (
     "handover_photo" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
-    "branch_id" TEXT,
+    "branch_id" UUID,
 
     CONSTRAINT "vehicles_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "marketings" (
-    "id" TEXT NOT NULL,
-    "showroom_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "showroom_id" UUID NOT NULL,
     "full_name" TEXT NOT NULL,
     "phone_number" TEXT NOT NULL,
     "address_city" TEXT NOT NULL,
@@ -140,9 +143,9 @@ CREATE TABLE "marketings" (
 
 -- CreateTable
 CREATE TABLE "bookings" (
-    "id" TEXT NOT NULL,
-    "vehicle_id" TEXT NOT NULL,
-    "marketing_id" TEXT,
+    "id" UUID NOT NULL,
+    "vehicle_id" UUID NOT NULL,
+    "marketing_id" UUID,
     "marketing_name" TEXT NOT NULL,
     "marketing_phone" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'hold',
