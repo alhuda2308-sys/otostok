@@ -450,3 +450,24 @@ Stage Summary:
 - Jawaban 3 pertanyaan user: (1) TIDAK ADA bucket yg dipanggil — endpoint /api/upload terhapus dr repo (404), desain lama disk lokal; (2) setelah fix: bucket media WAJIB PUBLIC (logo/header/foto unit utk katalog), KTP PRIVATE; (3) pakai SERVER ROUTE + SUPABASE_SERVICE_ROLE_KEY (bukan RLS anon) — auth aplikasi pakai cookie sendiri, RLS Supabase tak bisa diikat; policy anon justru lubang keamanan. KEDUA env WAJIB diisi di Vercel
 - Setelah deploy: user cukup set 2 env di Vercel (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) + redeploy — bucket otomatis dibuat saat upload pertama, tidak perlu setup manual di dashboard
 - Upload KTP ikut ter-fix (sama-sama disk-only sebelumnya) tanpa ubah kontrak URL
+
+---
+Task ID: upload-route-gitignore-fix
+Agent: Z.ai Code (main)
+Task: User "masih belum bisa upload" + Vercel logs PrismaClientInitializationError di semua API — akar masalah sebenarnya & perbaikan permanen.
+
+Work Log:
+- TERUNGKAP AKAR MASALAH SEBENARNYA: /api/upload yang "dipulihkan" di commit d4fcc6c TIDAK PERNAH masuk commit — .gitignore memuat pola `upload/` (tanpa slash awal) yang match SEMUA direktori bernama upload di seluruh repo, termasuk src/app/api/upload/ → git add diam-diam melewati file tsb → production 404 → "Upload foto gagal". File hanya ada di disk sandbox, E2E lokal lolos, commit kosong.
+- Fix .gitignore: `upload/` → `/upload/` (root-anchored; hanya folder KTP disk di root yang diabaikan) — src/app/api/upload/ kini ter-track git.
+- Re-create src/app/api/upload/route.ts (kali ini benar-benar ter-commit): runtime nodejs, wajib sesi (getSessionFromRequest → 401), guard khusus Vercel tanpa env Supabase → 500 dengan pesan lengkap cara mengisi SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (bukan EROFS misterius), maks 8 file/4MB, JPG/PNG/WebP, delegasi ke saveMediaFile (Supabase Storage otostok-media PUBLIC / fallback disk dev), respons { ok, urls } sesuai kontrak PhotoManager.
+- BARU: GET /api/health — diagnostik produksi tanpa auth & tanpa rahasia: protokol+host DATABASE_URL (tanpa kredensial), status storage (supabase/disk), ping SELECT 1, probe skema showroom (findFirst select id+logoUrl → menangkap P2021 tabel & P2022 kolom), hint solusi per masalah. Status 200 (ok) / 503 (gagal).
+- scripts/prisma-generate.sh: di Vercel (VERCEL terisi) — DATABASE_URL bukan postgres:// → build GAGAL CEPAT dengan instruksi lengkap (dulu: diam-diam generate client SQLite → semua query runtime PrismaClientInitializationError "URL must start with the protocol file:"). URL dicetak termasked (***@host).
+- src/lib/db-errors.ts: P1001 kini menyebut 2 kemungkinan (host salah / proyek Supabase pause → Dashboard → Restore); baru initErrorHint() utk PrismaClientInitializationError tanpa kode: "must start with the protocol `file:`" (client SQLite di produksi), "Environment variable not found: DATABASE_URL", "Unable to open the database file" — semuanya dgn langkah perbaikan eksplisit.
+- settings route: GET dibungkus try/catch → dbErrorResponse (dulu tanpa catch → body kosong), PATCH catch → dbErrorResponse (dulu 500 generik "Terjadi kesalahan server") — error DB asli kini tampil di layar Pengaturan.
+- E2E lokal lengkap (semua lolos): health 200 JSON benar; lisensi uji OTO-7LXY-4FG9-8K52 dibuat → aktivasi e2e-upload-test → login owner (username=no. WA) → upload tanpa sesi 401 → tipe svg 400 → upload 2 PNG batch 200 + file tersaji GET 200 → PATCH settings logoUrl 200 → GET settings konfirmasi → PATCH tanpa sesi 403 → name<3 char 400. agent-browser: login UI → /settings → unhide input → upload lightbox-desktop.png → toast "ditambahkan" → Simpan → toast "tersimpan" → API menunjukkan logoUrl JPG baru (kompresi browser bekerja) → 0 console error. Screenshot: tool-results/e2e-settings-upload.png.
+- Cleanup: 3 file uji dihapus, lisensi uji DELETE cascade (staff:1 taxonomies:10), showroom 404. lint bersih, dev.log tanpa error.
+
+Stage Summary:
+- PENYEBAB "Upload foto gagal" di produksi: 404 karena route tak pernah ter-commit (gitignore `upload/` terlalu luas) — BUKAN masalah bucket Supabase. Sekarang route benar2 ada di git.
+- Masalah kedua dari screenshot log Vercel user: SEMUA query DB gagal PrismaClientInitializationError (lebih fundamental dari upload) — indikasi kuat client SQLite ter-generate di Vercel (DATABASE_URL kosong/salah saat build) atau DB tak terjangkau. Sulap: build gagal cepat dgn pesan jelas; /api/health menunjukkan persis apa yang salah; error DB tampil lengkap di layar dgn hint.
+- Checklist user: (1) Vercel env DATABASE_URL (pooler.supabase.com:6543 + ?pgbouncer=true, scope Production) + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY; (2) Redeploy setelah env berubah; (3) cek Supabase tidak pause; (4) buka /api/health utk verifikasi.

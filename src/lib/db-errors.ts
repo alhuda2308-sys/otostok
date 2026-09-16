@@ -29,7 +29,7 @@ function mapPrismaCode(err: PrismaLikeError): { status: number; message: string 
       return {
         status: 503,
         message:
-          'Database tidak dapat dihubungi. Periksa host DATABASE_URL (jaringan/firewall Supabase).',
+          'Database tidak dapat dihubungi. Kemungkinan: (1) host DATABASE_URL salah — di Vercel pakai host pooler.supabase.com:6543 dengan ?pgbouncer=true; (2) proyek Supabase sedang pause (free tier) — buka Supabase Dashboard → Restore.',
       }
     case 'P1000':
       return {
@@ -61,6 +61,35 @@ function mapPrismaCode(err: PrismaLikeError): { status: number; message: string 
     default:
       return null
   }
+}
+
+/**
+ * Petunjuk solusi utk pola pesan PrismaClientInitializationError yang umum.
+ * Null bila polanya tidak dikenal (pesan asli tetap dikirim ke klien).
+ */
+function initErrorHint(msg: string): string | null {
+  if (msg.includes('must start with the protocol `file:`')) {
+    return (
+      'Prisma Client SQLite terpakai di server dengan DATABASE_URL Postgres. ' +
+      'Build produksi gagal menjalankan scripts/prisma-generate.sh dengan DATABASE_URL ' +
+      'Postgres — periksa env DATABASE_URL di Vercel (scope Production) lalu Redeploy.'
+    )
+  }
+  if (msg.includes('Environment variable not found: DATABASE_URL')) {
+    return (
+      'DATABASE_URL belum terbaca di server. Vercel → Project → Settings → ' +
+      'Environment Variables → tambahkan DATABASE_URL (Postgres Supabase) utk ' +
+      'scope Production, lalu Redeploy (perubahan env tidak berlaku pd deployment lama).'
+    )
+  }
+  if (msg.includes('Unable to open the database file')) {
+    return (
+      'Prisma Client SQLite mencoba membuka file database di server produksi ' +
+      '(filesystem Vercel read-only). Set DATABASE_URL ke Postgres Supabase ' +
+      '(pooler.supabase.com:6543 + ?pgbouncer=true) di Vercel lalu Redeploy.'
+    )
+  }
+  return null
 }
 
 /**
@@ -96,6 +125,18 @@ export function dbErrorResponse(e: unknown, context: string): NextResponse {
       },
       { status: 500 },
     )
+  }
+
+  // PrismaClientInitializationError tanpa kode terkenal — petakan pola pesan
+  // yang paling sering muncul di produksi supaya langsung ada petunjuk solusi.
+  if (code === 'UNKNOWN') {
+    const hint = initErrorHint(rawMsg)
+    if (hint) {
+      return NextResponse.json(
+        { error: hint, code, detail: rawMsg, context },
+        { status: 500 },
+      )
+    }
   }
 
   const mapped = mapPrismaCode(err)

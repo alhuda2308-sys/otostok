@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireOwnerSession } from '@/lib/auth'
+import { dbErrorResponse } from '@/lib/db-errors'
 
 /** String null-safe: null/undefined -> "", bukan "null". */
 function safeStr(v: unknown): string {
@@ -9,24 +10,28 @@ function safeStr(v: unknown): string {
 
 /** GET /api/admin/[slug]/settings — profil showroom (owner saja). */
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const session = requireOwnerSession(req, slug)
-  if (!session) {
-    return NextResponse.json({ error: 'Akses ditolak — khusus owner.' }, { status: 403 })
+  try {
+    const { slug } = await params
+    const session = requireOwnerSession(req, slug)
+    if (!session) {
+      return NextResponse.json({ error: 'Akses ditolak — khusus owner.' }, { status: 403 })
+    }
+    const showroom = await db.showroom.findUnique({ where: { slug } })
+    if (!showroom) {
+      return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
+    }
+    return NextResponse.json({
+      name: showroom.name,
+      slug: showroom.slug,
+      address: showroom.address,
+      ownerPhone: showroom.ownerPhone,
+      logoUrl: showroom.logoUrl,
+      headerUrl: showroom.headerUrl,
+      mapsUrl: showroom.mapsUrl,
+    })
+  } catch (e) {
+    return dbErrorResponse(e, 'settings GET')
   }
-  const showroom = await db.showroom.findUnique({ where: { slug } })
-  if (!showroom) {
-    return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
-  }
-  return NextResponse.json({
-    name: showroom.name,
-    slug: showroom.slug,
-    address: showroom.address,
-    ownerPhone: showroom.ownerPhone,
-    logoUrl: showroom.logoUrl,
-    headerUrl: showroom.headerUrl,
-    mapsUrl: showroom.mapsUrl,
-  })
 }
 
 /**
@@ -89,7 +94,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     await db.showroom.update({ where: { id: showroom.id }, data })
     return NextResponse.json({ ok: true })
   } catch (e) {
-    console.error('[settings] error:', e)
-    return NextResponse.json({ error: 'Terjadi kesalahan server.' }, { status: 500 })
+    return dbErrorResponse(e, 'settings PATCH')
   }
 }
