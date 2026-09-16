@@ -427,3 +427,26 @@ Stage Summary:
 - /api/activate kini tahan terhadap DB produksi yang drift: cek slug pakai findFirst, error Prisma asli tampil di layar (bukan 500 generik) — bila masih gagal setelah deploy, PESANNYA akan menyebut persis kolom/tabel yang bermasalah
 - AKAR MASALAH produksi (tabel lama kekurangan kolom/index) diperbaiki oleh supabase/migration-sync-existing-db.sql — WAJIB dijalankan user di Supabase SQL Editor: alter menambah kolom hilang + UNIQUE slug + FK, idempotent & aman utk dataExisting
 - license_id di create selalu dari lisensi terverifikasi; id showroom UUID v4 via schema default (konsisten b98ccd8); tidak ada perubahan schema.prisma
+
+---
+Task ID: upload-storage-supabase
+Agent: Z.ai Code (main)
+Task: Jawab 3 pertanyaan user soal upload foto (bucket Supabase? public? RLS vs service key?) + perbaiki error "Upload foto gagal" di Pengaturan Showroom — akar masalah & solusi produksi, push main.
+
+Work Log:
+- Diagnosa akar masalah: "Upload foto gagal" BUKAN soal bucket — aplikasi TIDAK PERNAH memakai Supabase Storage. PhotoManager memanggil POST /api/upload, tapi route itu TERHAPUS dari repo di commit 6e07b7f (commit sync besar-besaran; ada di commit awal 225028c, D di 6e07b7f) → 404 → pesan fallback. Desain lama: fs.writeFile ke public/uploads (disk server) — mustahil jalan di Vercel (filesystem serverless read-only). Pola sama pada KTP (lib/ktp.ts → upload/ktp/)
+- src/lib/storage.ts (BARU) — storage dual-backend otomatis:
+  • Supabase Storage (aktif bila SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY terisi): upload server-side via REST /storage/v1 dgn service key (x-upsert), bucket OTOMATIS dibuat saat upload pertama (GET bucket → 404 → POST create; cache per proses). MEDIA_BUCKET otostok-media (PUBLIC, path media/<uuid>.<ext>, URL publik permanen /storage/v1/object/public/...), KTP_BUCKET otostok-ktp (PRIVATE, dibaca server via service key)
+  • Fallback disk (dev lokal tanpa env): public/uploads/ & upload/ktp/ — perilaku lama tetap jalan
+- src/app/api/upload/route.ts (DI-BUAT ULANG): runtime nodejs, WAJIB sesi showroom (getSessionFromRequest → 401; route lama tanpa auth), maks 8 file/request, JPG/PNG/WebP, ≤4MB/file, respons { ok, urls } — kontrak sama dgn PhotoManager
+- lib/ktp.ts refactor ke storage helper (savePrivateFile/readPrivateFile/deletePrivateFile); kontrak URL /api/admin/marketings/ktp/[file] TETAP — data lama valid; proxy GET KTP baca via readPrivateFile (Supabase private bucket / disk)
+- .env.example: bagian Supabase Storage (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY + cara ambil + penjelasan bucket auto-create); catatan lama "service role key tidak dibutuhkan" dikoreksi (tidak utk DB, tapi YA utk storage)
+- .gitignore + public/uploads/ ; git rm --cached 5 jpg test yang sempat ter-track
+- E2E lokal (fallback disk, semua lolos): upload tanpa sesi 401 → upload 2 file dgn sesi owner 200 + file tersaji GET 200 → tipe invalid 400 → KTP upload 200 → baca KTP dgn sesi 200 / tanpa sesi 401
+- agent-browser /admin/upload-test/settings: halaman load → upload logo via PhotoManager (input unhide + setInputFiles) → POST 200 → preview muncul → Simpan → toast "Pengaturan tersimpan" → API konfirmasi logoUrl tersimpan → katalog publik /api/showrooms/{slug} menampilkan logoUrl; 0 console error; cleanup DELETE lisensi (cascade) 200
+- lint bersih
+
+Stage Summary:
+- Jawaban 3 pertanyaan user: (1) TIDAK ADA bucket yg dipanggil — endpoint /api/upload terhapus dr repo (404), desain lama disk lokal; (2) setelah fix: bucket media WAJIB PUBLIC (logo/header/foto unit utk katalog), KTP PRIVATE; (3) pakai SERVER ROUTE + SUPABASE_SERVICE_ROLE_KEY (bukan RLS anon) — auth aplikasi pakai cookie sendiri, RLS Supabase tak bisa diikat; policy anon justru lubang keamanan. KEDUA env WAJIB diisi di Vercel
+- Setelah deploy: user cukup set 2 env di Vercel (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) + redeploy — bucket otomatis dibuat saat upload pertama, tidak perlu setup manual di dashboard
+- Upload KTP ikut ter-fix (sama-sama disk-only sebelumnya) tanpa ubah kontrak URL

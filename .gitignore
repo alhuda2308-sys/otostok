@@ -62,3 +62,4 @@ agent-ctx/
 download/
 *.pid
 upload/
+public/uploads/

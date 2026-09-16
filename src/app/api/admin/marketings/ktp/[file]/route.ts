@@ -1,7 +1,6 @@
-import fs from 'fs/promises'
 import { NextResponse } from 'next/server'
 import { requireShowroomSession } from '@/lib/auth'
-import { resolveKtpPath } from '@/lib/ktp'
+import { readPrivateFile } from '@/lib/storage'
 
 const CONTENT_TYPES: Record<string, string> = {
   jpg: 'image/jpeg',
@@ -13,6 +12,7 @@ const CONTENT_TYPES: Record<string, string> = {
  * GET /api/admin/marketings/ktp/[file]
  * Pratinjau foto KTP — AMAN: hanya bisa diakses Owner/Admin showroom yang sama.
  * Slug showroom tersimpan di nama file dan dicocokkan dengan sesi login.
+ * Backend: bucket PRIVATE "otostok-ktp" (produksi) atau disk upload/ktp (lokal).
  */
 export async function GET(req: Request, { params }: { params: Promise<{ file: string }> }) {
   const { file } = await params
@@ -30,13 +30,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ file: st
     return NextResponse.json({ error: 'Tidak diizinkan.' }, { status: 401 })
   }
 
-  const p = resolveKtpPath(file)
-  if (!p) {
-    return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 404 })
-  }
-
   try {
-    const buf = await fs.readFile(p)
+    const buf = await readPrivateFile(file)
     const ext = file.split('.').pop()!.toLowerCase()
     return new NextResponse(new Uint8Array(buf), {
       headers: {
