@@ -534,3 +534,21 @@ Stage Summary:
 - /api/health kini juga men-deteksi drift khusus tabel vehicles.
 - Bug "Tambah merk baru" utk nama sudah-terdaftar diperbaiki (409 → otomatis memilih merk tsb).
 - Alur tambah-motor end-to-end (form + foto + submit) terverifikasi jalan normal di lokal.
+
+---
+Task ID: postgres-array-column-fix
+Agent: Z.ai Code (main)
+Task: User kirim screenshot error tambah motor SETELAH deploy fab6e5d — error asli akhirnya terlihat (transparansi berhasil): "PostgresError code 54000: number of array dimensions (1528981620) exceeds the maximum allowed (6)" saat prisma.vehicle.create().
+
+Work Log:
+- Akar masalah DIPASTIKAN: angka 1528981620 ≈ byte ASCII '[' '"', 'h'… = awal string JSON ["https://… dibaca sbg header biner array Postgres (4 byte pertama = ndim). Artinya kolom photos (atau teks lain) di tabel vehicles produksi terlanjur bertipe text[] (ARRAY), bukan TEXT. Prisma mengirim string → Postgres decode biner sbg array → error 54000. Konsisten dgn gejala: READ kosong (0 unit) sukses, INSERT gagal; SQLite lokal tak pernah repro.
+- Verifikasi git: TIDAK ADA versi schema.postgres.prisma yang memakai String[] — tabel produksi dibuat manual/di luar repo (DB lama pra-schema.sql, konsisten dgn riwayat P2022 aktivasi).
+- Fix 1 — supabase/migration-sync-existing-db.sql: bagian (3) baru "KOREKSI TIPE KOLOM array → TEXT": DO block idempotent memeriksa information_schema.columns (schema public), lalu utk setiap kolom teks-expected yang bertipe ARRAY: DROP DEFAULT → ALTER TYPE TEXT USING array_to_json(col)::text (format JSON persis yg diharapkan aplikasi; data tak hilang) → SET DEFAULT '[]' utk photos/arrival_photos. Semua 39 kolom teks skema tercakup. Header file + instruksi diperbarui.
+- Fix 2 — db-errors.ts: initErrorHint pola 'number of array dimensions' → toast memandu jalankan migration-sync-existing-db.sql (bagian 3 otomatis konversi).
+- Verifikasi hint: bun script menyuntik pesan error PERSIS dari screenshot user → status 500 + error memuat instruksi array→TEXT + detail asli diteruskan. Lint bersih.
+- Batasan: tidak ada Postgres lokal di sandbox — validasi SQL via review sintaks standar (dollar-quoting, format %I, USING CASE, information_schema) — pola identik dgn DO block FK yang sudah terbukti jalan di SQL Editor user.
+
+Stage Summary:
+- Penyebab keempat (rantai tambah-motor) = tipe kolom array di DB produksi lama; perbaikan lewat SQL idempotent yang dijalankan user di Supabase SQL Editor (sekali paste).
+- Bila user jalankan file terbaru lalu retry → INSERT vehicles masuk ke kolom TEXT dgn JSON foto, alur normal.
+- Rantai diagnosa kini lengkap: P2022 kolom hilang / array dimensions / init errors — semuanya terpetakan ke instruksi konkret di layar.

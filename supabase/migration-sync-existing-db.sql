@@ -9,16 +9,20 @@
 --       yang tidak ada di tabel, query showroom langsung error — P2022)
 --     • "P2022: The column ... does not exist in the current database"
 --     • Slug duplikat terdeteksi meski seharusnya unik (index UNIQUE hilang)
+--     • Gagal tambah/edit unit: "number of array dimensions (…) exceeds the
+--       maximum allowed (6)" → kolom teks terlanjur bertipe array (text[])
 --
 -- ISI migrasi ini:
 --   1. CREATE TABLE IF NOT EXISTS  — tabel yang belum ada dibuat lengkap
 --   2. ALTER TABLE ADD COLUMN IF NOT EXISTS — kolom yang hilang ditambahkan
 --      (aman untuk tabel yang sudah berisi data: kolom teks wajib diberi
 --      default '', boolean/timestamp diberi default)
---   3. CREATE [UNIQUE] INDEX IF NOT EXISTS — index & UNIQUE disamakan,
+--   3. KOREKSI TIPE — kolom yang terlanjur bertipe ARRAY dikonversi ke TEXT
+--      (array_to_json → format JSON persis yg diharapkan aplikasi)
+--   4. CREATE [UNIQUE] INDEX IF NOT EXISTS — index & UNIQUE disamakan,
 --     termasuk showrooms_slug_key (slug WAJIB unik — konsisten dengan
 --      @unique pada prisma/schema.postgres.prisma)
---   4. FOREIGN KEY — ditambahkan hanya bila belum ada (DO block)
+--   5. FOREIGN KEY — ditambahkan hanya bila belum ada (DO block)
 --
 -- AMAN dijalankan BERULANG (idempotent). Tidak ada data yang diubah/dihapus.
 -- Cara pakai: Supabase Dashboard → SQL Editor → paste seluruh isi file → Run.
@@ -233,8 +237,55 @@ ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT '
 ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "expires_at" TIMESTAMP(3);
 ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
+-- -----------------------------------------------------------
+-- 3) KOREKSI TIPE KOLOM: array (text[] dll) → TEXT
+--    Gejala yang diperbaiki: gagal tambah/edit unit dgn error
+--      "number of array dimensions (…juta…) exceeds the maximum allowed (6)"
+--    Penyebab: tabel lama (dibuat manual sebelum schema.sql ada) memiliki
+--    kolom teks yang terlanjur bertipe ARRAY Postgres. Prisma mengirim nilai
+--    sbg string (mis. JSON "[\"url\",…]") — Postgres men-decode binernya
+--    sbg array → ndim terbaca byte acak → error 54000.
+--    Konversi AMAN utk data: elemen array diubah ke JSON (array_to_json),
+--    persis format yang diharapkan aplikasi (JSON array of string).
+--    Idempotent: hanya menyentuh kolom yang datanya bertipe ARRAY.
+-- -----------------------------------------------------------
+
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT c.table_name, c.column_name
+    FROM information_schema.columns c
+    JOIN (VALUES
+      -- kolom yang SEHARUSNYA bertipe TEXT sesuai skema aplikasi
+      ('licenses','license_key'),('licenses','plan_type'),('licenses','status'),
+      ('showrooms','name'),('showrooms','slug'),('showrooms','owner_phone'),('showrooms','address'),('showrooms','logo_url'),('showrooms','header_url'),('showrooms','maps_url'),
+      ('staff_accounts','name'),('staff_accounts','username'),('staff_accounts','password_hash'),('staff_accounts','role'),
+      ('branches','name'),('branches','address'),('branches','maps_url'),
+      ('taxonomies','kind'),('taxonomies','name'),
+      ('vehicles','brand'),('vehicles','model'),('vehicles','category'),('vehicles','license_plate'),('vehicles','color'),('vehicles','tax_status'),('vehicles','document_status'),('vehicles','status'),('vehicles','photos'),('vehicles','notes'),('vehicles','arrival_notes'),('vehicles','arrival_photos'),('vehicles','sold_by'),('vehicles','handover_photo'),
+      ('marketings','full_name'),('marketings','phone_number'),('marketings','address_city'),('marketings','ktp_photo_url'),('marketings','notes'),
+      ('bookings','marketing_name'),('bookings','marketing_phone'),('bookings','status')
+    ) AS wanted(tbl, col)
+      ON c.table_name = wanted.tbl AND c.column_name = wanted.col
+    WHERE c.data_type = 'ARRAY'
+      AND c.table_schema = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT', r.table_name, r.column_name);
+    EXECUTE format(
+      'ALTER TABLE %I ALTER COLUMN %I TYPE TEXT USING (CASE WHEN %I IS NULL THEN NULL ELSE array_to_json(%I)::text END)',
+      r.table_name, r.column_name, r.column_name, r.column_name);
+    -- default kembali utk kolom JSON foto (sesuai skema Prisma)
+    IF r.table_name = 'vehicles' AND r.column_name IN ('photos','arrival_photos') THEN
+      EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT ''[]''', r.table_name, r.column_name);
+    END IF;
+    RAISE NOTICE 'Kolom %.% dikonversi dari ARRAY ke TEXT', r.table_name, r.column_name;
+  END LOOP;
+END $$;
+
 -- ------------------------------------------------------------
--- 3) Index & UNIQUE — disamakan dengan schema.postgres.prisma
+-- 4) Index & UNIQUE — disamakan dengan schema.postgres.prisma
 --    Termasuk showrooms_slug_key: slug WAJIB unik (poin 3 permintaan —
 --    atribut @unique slug kini juga ada di tabel Supabase, bukan hanya
 --    di schema Prisma).
@@ -256,7 +307,7 @@ CREATE INDEX IF NOT EXISTS "bookings_vehicle_id_status_idx" ON "bookings"("vehic
 CREATE INDEX IF NOT EXISTS "bookings_marketing_id_idx" ON "bookings"("marketing_id");
 
 -- ------------------------------------------------------------
--- 4) FOREIGN KEY — hanya ditambahkan bila belum ada (idempotent)
+-- 5) FOREIGN KEY — hanya ditambahkan bila belum ada (idempotent)
 -- ------------------------------------------------------------
 
 DO $$ BEGIN

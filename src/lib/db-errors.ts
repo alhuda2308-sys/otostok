@@ -96,6 +96,15 @@ function initErrorHint(msg: string): string | null {
       '(pooler.supabase.com:6543 + ?pgbouncer=true) di Vercel lalu Redeploy.'
     )
   }
+  if (msg.includes('number of array dimensions')) {
+    return (
+      'Kolom di database produksi terlanjur bertipe ARRAY Postgres (text[]) ' +
+      'padahal aplikasi mengirim teks (mis. daftar foto sbg JSON). Perbaiki ' +
+      '(1 menit): buka Supabase Dashboard → SQL Editor → paste SELURUH isi file ' +
+      'supabase/migration-sync-existing-db.sql → Run — bagian (3) otomatis ' +
+      'mengonversi kolom array menjadi TEXT dengan aman, lalu coba lagi.'
+    )
+  }
   return null
 }
 
