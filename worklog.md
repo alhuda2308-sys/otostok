@@ -371,3 +371,35 @@ Stage Summary:
 - User TIDAK perlu menjalankan ulang supabase/schema.sql (DB yang sudah ada tetap dipakai; DDL baru hanya utk setup fresh)
 - Prinsip penting tercatat: di schema Postgres, PK & kolom FK UUID wajib @db.Uuid + @default(uuid()); cuid() hanya utk schema SQLite lokal
 - Bila masih ada error setelah deploy, error asli kini tampil di layar (fitur diagnosa commit e2416e0) — mis. ketidakcocokan tipe kolom lain (timestamptz vs timestamp) akan langsung terbaca
+
+---
+Task ID: super-admin-delete-license
+Agent: Z.ai Code (main)
+Task: Tambah fitur Hapus Lisensi (hard delete) & Hapus Akun Showroom di panel /super-admin — endpoint DELETE terlindungi, tombol UI merah + dialog konfirmasi, error handling JSON rapi; uji alur lalu push main.
+
+Work Log:
+- Endpoint baru src/app/api/super-admin/licenses/[id]/route.ts (DELETE):
+  - Auth berlapis: cookie otostok_sa (utama) → header X-Super-Secret → ?key= → body { key }
+  - Lisensi belum terikat showroom → hapus baris lisensi saja
+  - Lisensi terikat showroom → hard delete cascade dalam SATU transaksi db.$transaction dgn urutan leaf-first: booking (via vehicle ids showroom) → vehicle → staffAccount → branch → taxonomy → marketing → showroom → license — TIDAK bergantung definisi ON DELETE FK di DB Supabase produksi (dibuat di luar kontrol aplikasi)
+  - Respons selalu JSON: 200 dgn statistik jumlah baris terhapus per tabel; 401/404/400; catch → dbErrorResponse (P2003 FK constraint → 409 JSON rapi dgn code+detail)
+- Schema: Showroom.license + onDelete: Cascade (kedua schema sqlite & postgres) + supabase/schema.sql di-regenerate (FK showrooms.license_id → ON DELETE CASCADE) — cascade eksplisit di handler tetap jadi mekanisme utama, cascade DB = lapisan kedua utk setup fresh
+- Catatan teknis: rebuild supabase/schema.sql dgn redirection { head; cat; } > file-yang-sama menyebabkan header hilang (truncation sebelum head selesai) — ditulis ulang header lengkap via /tmp lalu concat
+- UI super-admin-client.tsx:
+  - State deleteTarget + handleDelete (fetch DELETE dgn body key fallback, parse aman formatApiError)
+  - Tombol "Hapus" merah (Trash2) di actionCell — tabel desktop & kartu mobile (grid 3→2 kolom jadi 2x2 rapi)
+  - AlertDialog konfirmasi: teks wajib "Apakah Anda yakin ingin menghapus lisensi/akun ini secara permanen? Tindakan ini tidak dapat dibatalkan." + rincian lisensi/showroom/unit yg ikut terhapus; tombol "Ya, Hapus Permanen" merah + spinner; e.preventDefault() agar dialog tertutup HANYA setelah sukses
+  - Toast sukses + refetch otomatis; error → dialog tetap terbuka utk batal/coba lagi
+- Uji alur (semua lolos):
+  - DELETE tanpa auth → 401
+  - DELETE lisensi kosong → 200 (showroom:null, semua count 0)
+  - Cascade nyata: lisensi → aktivasi (showroom + owner staff + 10 taxonomies) → DELETE 200 dgn staff:1 taxonomies:10 → API /api/showrooms/{slug} 404
+  - DELETE id tak ada → 404
+  - agent-browser: tombol tampil → dialog dgn teks tepat → konfirmasi → toast "dihapus permanen" → baris hilang dr tabel; 0 console error
+  - lint bersih; dev.log DELETE 200
+- Git: commit 4621524 → push main
+
+Stage Summary:
+- Super Admin kini punya kontrol penuh siklus hidup klien: buat → suspend/unsuspend → perpanjang → HAPUS PERMANEN
+- Penghapusan aman utk DB produksi apa pun kondisi FK-nya (transaksi leaf-first), dgn jejak audit di log server (jumlah unit/booking/staff terhapus)
+- Alur owner showroom setelah akun dihapus: sesi mereka otomatis gagal (data staff hilang → login/lookup 401/404)
