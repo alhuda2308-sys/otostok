@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { dbErrorResponse } from '@/lib/db-errors'
 import { hashPassword } from '@/lib/auth'
 import { DEFAULT_BRANDS, DEFAULT_CATEGORIES } from '@/lib/constants'
 import { isReservedSlug, isValidLicenseKey, slugify } from '@/lib/slug'
@@ -9,6 +10,20 @@ import { isReservedSlug, isValidLicenseKey, slugify } from '@/lib/slug'
  * Aktivasi lisensi & pembuatan showroom.
  * Validasi: key ada, aktif, belum kedaluwarsa, belum terikat showroom lain, slug unik.
  * Sekalian: buat akun Owner (login dashboard) + kategori & merk default.
+ *
+ * Urutan yang dijamin:
+ *   1. SEMUA input divalidasi dulu (licenseKey, name, slug, phone, address,
+ *      password) — sebelum satu pun query database dijalankan.
+ *   2. Cek slug memakai findFirst (bukan findUnique) — tidak bergantung pada
+ *      index/constraint UNIQUE di database produksi (DB Supabase lama yang
+ *      dibuat di luar supabase/schema.sql bisa kekurangan index/kolom →
+ *      findUnique({ where: { slug } }) gagal, mis. P2022/P2021).
+ *   3. showroom.create memakai licenseId dari lisensi yang SUDAH diverifikasi
+ *      (ada, aktif, belum terikat). id showroom TIDAK dikirim manual — Prisma
+ *      mengisi dari @default(uuid()) schema Postgres (UUIDv4 utk kolom UUID
+ *      Supabase, lihat commit b98ccd8).
+ *   4. catch → dbErrorResponse: error Prisma asli (kode + pesan) tampil di
+ *      layar aktivasi, bukan disembunyikan di balik "kesalahan server".
  */
 export async function POST(req: Request) {
   try {
@@ -78,7 +93,12 @@ export async function POST(req: Request) {
       )
     }
 
-    const slugTaken = await db.showroom.findUnique({ where: { slug } })
+    // findFirst + select minimal: aman utk DB produksi apa pun kondisi
+    // index/kolomnya (lihat komentar header); cukup tahu "ada atau tidak".
+    const slugTaken = await db.showroom.findFirst({
+      where: { slug },
+      select: { id: true },
+    })
     if (slugTaken) {
       return NextResponse.json(
         { error: `Slug "${slug}" sudah dipakai showroom lain. Coba slug berbeda.` },
@@ -91,6 +111,9 @@ export async function POST(req: Request) {
       // username unik per showroom, tapi hindari kebingungan dengan akun global lain
     })
 
+    // licenseId = id lisensi TERVERIKASI di atas (ada, aktif, belum terikat).
+    // id showroom diisi Prisma via @default(uuid()) — UUIDv4 konsisten dgn
+    // kolom UUID Supabase (jangan kirim cuid/nanoid manual di sini).
     const showroom = await db.showroom.create({
       data: {
         licenseId: license.id,
@@ -126,7 +149,10 @@ export async function POST(req: Request) {
       ownerUsername: owner?.username ?? ownerPhone,
     })
   } catch (e) {
-    console.error('[activate] error:', e)
-    return NextResponse.json({ error: 'Terjadi kesalahan server.' }, { status: 500 })
+    // Mode diagnosa (selaras dgn route super-admin): kode error Prisma asli
+    // (P2022 kolom tidak cocok, P2021 tabel belum ada, P2002 duplikat, dst.)
+    // dikirim apa adanya + pesan ramah — supaya drift DB produksi langsung
+    // terlihat di layar /activate tanpa harus buka log server.
+    return dbErrorResponse(e, 'activate')
   }
 }

@@ -10,6 +10,10 @@
 --   • Jalankan pada database Supabase yang MASIH KOSONG (sekali saja).
 --     Bila sudah pernah dijalankan, tabel akan dilaporkan "already exists"
 --     — itu berarti skema sudah ada, abaikan/skip.
+--   • Database SUDAH ADA tapi muncul error "Invalid prisma.showroom
+--     .findUnique() invocation" / "P2022: column ... does not exist"?
+--     → Jangan pakai file ini; jalankan migration-sync-existing-db.sql
+--       (idempotent, menambahkan kolom/index yang hilang pada tabel lama).
 --   • Skema ini di-generate dari prisma/schema.postgres.prisma
 --     (sumber kebenaran model aplikasi).
 --   • Semua kolom ID & FK bertipe UUID — aplikasi (Prisma) mengisi

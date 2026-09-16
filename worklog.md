@@ -403,3 +403,27 @@ Stage Summary:
 - Super Admin kini punya kontrol penuh siklus hidup klien: buat → suspend/unsuspend → perpanjang → HAPUS PERMANEN
 - Penghapusan aman utk DB produksi apa pun kondisi FK-nya (transaksi leaf-first), dgn jejak audit di log server (jumlah unit/booking/staff terhapus)
 - Alur owner showroom setelah akun dihapus: sesi mereka otomatis gagal (data staff hilang → login/lookup 401/404)
+
+---
+Task ID: activate-findfirst-fix
+Agent: Z.ai Code (main)
+Task: Perbaiki error 500 "[activate] error: Invalid prisma.showroom.findUnique() invocation" saat aktivasi lisensi di Vercel+Supabase — ganti findUnique→findFirst utk cek slug, validasi input sebelum query, pastikan license_id valid & id showroom UUID v4, samakan UNIQUE slug schema↔tabel Supabase, push main.
+
+Work Log:
+- Diagnosa: error muncul di query showroom PERTAMA (license.findUnique sukses — koneksi & tabel licenses OK). Prisma men-SELECT semua kolom skema; DB Supabase user dibuat DI LUAR supabase/schema.sql (terbukti di worklog supabase-uuid-p2023: id UUID sementara DDL lama repo TEXT) → tabel showrooms lama hampir pasti kekurangan kolom baru (logo_url/header_url/maps_url) → P2022 "column does not exist" saat findUnique. Diagnosis user (@unique hilang) tidak tepat — slug SUDAH @unique di schema.postgres.prisma sejak awal; TS build Vercel lolos = filter findUnique valid. Tapi findFirst tetap lebih defensif & diminta eksplisit
+- src/app/api/activate/route.ts:
+  - db.showroom.findUnique({where:{slug}}) → db.showroom.findFirst({where:{slug}, select:{id:true}}) — tidak bergantung index/constraint UNIQUE di DB produksi + select minimal
+  - Header doc: urutan dijamin — (1) SEMUA input divalidasi SEBELUM query DB (licenseKey format, nama≥3, slug≥3, reserved slug, phone 9-15 digit, alamat≥5, password≥6 — sudah ada sejak sebelumnya, dipertahankan), (2) cek slug findFirst, (3) create memakai licenseId dari lisensi TERVERIKASI (ada, aktif, belum terikat), id showroom diisi @default(uuid()) schema — TIDAK ada id manual cuid/nanoid, (4) catch → dbErrorResponse
+  - catch: console.error manual + 500 generik "Terjadi kesalahan server." DIGANTI dbErrorResponse(e,'activate') — error Prisma asli (P2022/P2021/P2002 + pesan + code) kini tampil di layar /activate (client sudah menampilkan j.error), selaras mode diagnosa commit e2416e0
+- supabase/migration-sync-existing-db.sql (BARU, idempotent): perbaikan akar masalah utk DB lama — CREATE TABLE IF NOT EXISTS (8 tabel), ALTER TABLE ADD COLUMN IF NOT EXISTS utk semua kolom fitur (logo_url/header_url/maps_url showrooms, kolom mutasi vehicles, dst — default aman utk tabel berisi data), CREATE [UNIQUE] INDEX IF NOT EXISTS (termasuk showrooms_slug_key — slug unik kini JUGA dijamin di tabel Supabase, bukan hanya schema), FK via DO block (duplicate_object catch)
+- supabase/schema.sql: header ditambah rujukan → bila DB sudah ada dan muncul P2022/findUnique error, jalankan migration-sync-existing-db.sql (bukan schema.sql yg utk DB kosong)
+- Verifikasi schema: prisma validate (postgres, dummy URL) valid; slug @unique & @default(uuid()) @db.Uuid terkonfirmasi — TIDAK perlu ubah schema (b98ccd8 sudah benar), tidak perlu regen client
+- E2E lokal (semua lolos): generate lisensi → POST /api/activate 200 (showroom+owner+10 taxonomies) → slug duplikat 409 via findFirst → lisensi terikat 409 → validasi 400 (nama/phone/password, terbukti sebelum query) → body JSON rusak → 400 aman (parser catch) → lisensi tidak ada 404 → GET /api/showrooms/{slug} 200 → login owner 200
+- agent-browser /activate: form terisi → submit → kartu "Showroom Aktif!" + toast + tautan /admin/{slug} & /s/{slug}; 0 console error
+- Cleanup via DELETE /api/super-admin/licenses/{id} (regresi fitur hapus): 2 lisensi uji terhapus dgn cascade (staff:1 taxonomies:10), showroom 404 setelahnya
+- lint bersih; dev.log tanpa error (SQL findFirst LIMIT/OFFSET terlihat benar)
+
+Stage Summary:
+- /api/activate kini tahan terhadap DB produksi yang drift: cek slug pakai findFirst, error Prisma asli tampil di layar (bukan 500 generik) — bila masih gagal setelah deploy, PESANNYA akan menyebut persis kolom/tabel yang bermasalah
+- AKAR MASALAH produksi (tabel lama kekurangan kolom/index) diperbaiki oleh supabase/migration-sync-existing-db.sql — WAJIB dijalankan user di Supabase SQL Editor: alter menambah kolom hilang + UNIQUE slug + FK, idempotent & aman utk dataExisting
+- license_id di create selalu dari lisensi terverifikasi; id showroom UUID v4 via schema default (konsisten b98ccd8); tidak ada perubahan schema.prisma
