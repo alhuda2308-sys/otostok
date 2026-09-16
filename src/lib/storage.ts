@@ -51,6 +51,21 @@ export function supabaseStorageActive(): boolean {
   return Boolean(SUPABASE_URL && SERVICE_KEY)
 }
 
+/**
+ * Header autentikasi utk Supabase REST/Storage API.
+ * PENTING: Supabase hosted butuh DUA header — `Authorization: Bearer <key>`
+ * DAN `apikey: <key>`. Tanpa `apikey`, gateway menjawab:
+ *   401 {"message":"No API key found in request","hint":"No 'apikey' request
+ *   header or url param was found."}
+ */
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    Authorization: `Bearer ${SERVICE_KEY}`,
+    apikey: SERVICE_KEY,
+    ...extra,
+  }
+}
+
 // Bucket yang sudah dipastikan ada — cache per proses server agar tidak
 // mengecek bucket pada setiap upload.
 const ensuredBuckets = new Set<string>()
@@ -58,10 +73,9 @@ const ensuredBuckets = new Set<string>()
 /** Pastikan bucket ada — buat otomatis bila belum (idempotent). */
 async function ensureBucket(bucket: string, isPublic: boolean): Promise<void> {
   if (ensuredBuckets.has(bucket)) return
-  const headers = { Authorization: `Bearer ${SERVICE_KEY}` }
 
   const probe = await fetch(`${SUPABASE_URL}/storage/v1/bucket/${bucket}`, {
-    headers,
+    headers: authHeaders(),
     cache: 'no-store',
   })
   if (probe.ok) {
@@ -71,7 +85,7 @@ async function ensureBucket(bucket: string, isPublic: boolean): Promise<void> {
 
   const create = await fetch(`${SUPABASE_URL}/storage/v1/bucket`, {
     method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ name: bucket, public: isPublic }),
   })
   // 400 "Bucket already exists" dianggap sukses (race antar instance)
@@ -94,11 +108,10 @@ async function uploadObject(
 ): Promise<void> {
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${objectPath}`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${SERVICE_KEY}`,
+    headers: authHeaders({
       'Content-Type': contentType,
       'x-upsert': 'true',
-    },
+    }),
     body: new Uint8Array(buf),
   })
   if (!res.ok) {
@@ -111,7 +124,7 @@ async function uploadObject(
 
 async function downloadObject(bucket: string, objectPath: string): Promise<Buffer> {
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${objectPath}`, {
-    headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+    headers: authHeaders(),
     cache: 'no-store',
   })
   if (!res.ok) {
@@ -123,7 +136,7 @@ async function downloadObject(bucket: string, objectPath: string): Promise<Buffe
 async function deleteObject(bucket: string, objectPath: string): Promise<void> {
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${objectPath}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+    headers: authHeaders(),
   })
   if (!res.ok) {
     throw new Error(`Supabase Storage hapus file gagal (${res.status}).`)

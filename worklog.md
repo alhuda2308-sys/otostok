@@ -471,3 +471,22 @@ Stage Summary:
 - PENYEBAB "Upload foto gagal" di produksi: 404 karena route tak pernah ter-commit (gitignore `upload/` terlalu luas) — BUKAN masalah bucket Supabase. Sekarang route benar2 ada di git.
 - Masalah kedua dari screenshot log Vercel user: SEMUA query DB gagal PrismaClientInitializationError (lebih fundamental dari upload) — indikasi kuat client SQLite ter-generate di Vercel (DATABASE_URL kosong/salah saat build) atau DB tak terjangkau. Sulap: build gagal cepat dgn pesan jelas; /api/health menunjukkan persis apa yang salah; error DB tampil lengkap di layar dgn hint.
 - Checklist user: (1) Vercel env DATABASE_URL (pooler.supabase.com:6543 + ?pgbouncer=true, scope Production) + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY; (2) Redeploy setelah env berubah; (3) cek Supabase tidak pause; (4) buka /api/health utk verifikasi.
+
+---
+Task ID: supabase-storage-apikey-header
+Agent: Z.ai Code (main)
+Task: Upload di produksi masih gagal — toast "Gagal membuat bucket Supabase "otostok-media" (401): {"message":"No API key found in request","hint":"No 'apikey' request header or url param was found."}"
+
+Work Log:
+- Progress terkonfirmasi dari screenshot user: route /api/upload SUDAH jalan di produksi, settings page termuat (DB sehat), env Supabase TERISI (jalur storage aktif). Gagal tepat di REST call Supabase Storage.
+- Akar masalah: src/lib/storage.ts hanya mengirim header `Authorization: Bearer <service_key>` — gateway Supabase hosted WAJIB header `apikey: <key>` JUGA; tanpa itu semua request (probe/create bucket, upload, download, delete) ditolak 401 "No API key found in request".
+- Fix: helper authHeaders() yang SELALU menyertakan `Authorization: Bearer` + `apikey` (+extra) — dipakai di 4 titik: ensureBucket (probe & create), uploadObject, downloadObject, deleteObject.
+- E2E dengan mock Supabase Storage (port 3999) yang menolak request tanpa apikey PERSIS seperti produksi:
+  • curl tanpa apikey → 401 {"message":"No API key found in request",...} (reproduksi persis error user)
+  • curl dengan apikey → sukses
+  • test integrasi modul storage.ts asli: saveMediaFile → URL publik otostok-media/media/<uuid>.png ✔, savePrivateFile/readPrivateFile/deletePrivateFile (KTP) ✔, 7/7 request membawa apikey+Bearer ✔, bucket auto-create ✔ — SEMUA TES LOLOS
+- lint bersih; artefak test dihapus.
+
+Stage Summary:
+- Satu-baris-esensi: Supabase Storage hosted butuh DUA header auth (`Authorization: Bearer` + `apikey`). Setelah deploy ini, upload pertama akan OTOMATIS membuat bucket otostok-media (PUBLIC) & otostok-ktp (PRIVATE) lalu menyimpan file — tidak ada setup manual di dashboard Supabase.
+- Tidak ada perubahan env/kontrak API; user tinggal tunggu deploy selesai lalu ulangi upload logo/header/foto unit.
