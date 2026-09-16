@@ -552,3 +552,19 @@ Stage Summary:
 - Penyebab keempat (rantai tambah-motor) = tipe kolom array di DB produksi lama; perbaikan lewat SQL idempotent yang dijalankan user di Supabase SQL Editor (sekali paste).
 - Bila user jalankan file terbaru lalu retry → INSERT vehicles masuk ke kolom TEXT dgn JSON foto, alur normal.
 - Rantai diagnosa kini lengkap: P2022 kolom hilang / array dimensions / init errors — semuanya terpetakan ke instruksi konkret di layar.
+
+---
+Task ID: migration-sql-array-to-json-failure
+Agent: Z.ai Code (main)
+Task: User jalankan migration-sync-existing-db.sql di Supabase SQL Editor → gagal "ERROR: 42883: function array_to_json(text) does not exist" (LINE 8, arrival_photos). Screenshot SQL Editor menunjukkan user menjalankan SNIPPET LAMA 9 baris (ALTER ... USING array_to_json(photos/arrival_photos) polos), bukan file repo versi DO block.
+
+Work Log:
+- Diagnosis dari screenshot: line 3 (photos) LOLOS → photos memang text[] di DB produksi; line 8 (arrival_photos) GAGAL → arrival_photos sudah bertipe text, dan Postgres tidak punya array_to_json(text). Snippet lama tidak tahan multi-tipe kolom.
+- Rewrite migration-sync-existing-db.sql v2: (a) DO block koreksi tipe kini menangani ARRAY (via array_to_json), json/jsonb (via ::text), dan MELIHAT kolom text/varchar; (b) tiap kolom punya BEGIN/EXCEPTION sendiri → satu kolom aneh tak menggagalkan migrasi (WARNING saja); (c) semua CREATE UNIQUE INDEX dibungkus DO block WHEN OTHERS → data duplikat tak lagi menggagalkan migrasi (WARNING + petunjuk pembersihan); (d) FK juga catch OTHERS (data orphan); (e) QUERY VERIFIKASI di akhir file → panel Results menampilkan vehicles_kolom_baru_ok|slug_unique_ok|tipe_photos|tipe_arrival_photos (harapan 7|1|text|text).
+- Verifikasi NYATA pertama kali utk SQL ini: PGlite (@electric-sql/pglite, Postgres asli WASM) di tool-results/mig-test (sudah dihapus setelah tes) — 3 skenario: (A) replika DB user: photos text[] berisi data + arrival_photos TEXT + kolom hilang → migrasi sukses, photos terkonversi '["url1","url2"]', arrival_photos utuh, Run ke-2 idempotent; (B) arrival_photos JSONB → terkonversi text utuh; (C) DB kosong → 8 tabel dibuat. Query verifikasi = 7|1|text|text di semua skenario. 33/33 asersi lulus.
+- Catatan proses: PGlite mengembalikan count(*) sbg number (bukan string) — assertion test awal salah type, diperbaiki lalu semua hijau.
+
+Stage Summary:
+- File migrasi v2 terbukti jalan di Postgres asli utk 3 kondisi DB (array+text, jsonb, kosong) dan aman di-Run berulang.
+- Instruksi user: paste SELURUH isi file terbaru (351→~370 baris, diawali komentar "-- OtoStok — Migrasi SINKRONISASI ... v2"), bukan snippet lama; cek panel Results harus 7|1|text|text; lalu /api/health harus step ok; lalu retry tambah motor.
+- Kalau panel Results sudah benar tapi tambah motor masih gagal → toast kini menampilkan error asli; kirim screenshot/health JSON untuk lanjut.

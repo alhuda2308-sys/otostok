@@ -1,31 +1,34 @@
 -- ============================================================
 -- OtoStok — Migrasi SINKRONISASI untuk database Supabase yang SUDAH ADA
+-- (v2 — tahan segala kondisi kolom: text[], json, jsonb, text)
 -- ============================================================
 -- KAPAN dipakai:
---   Bila database Supabase dibuat SEBELUM versi skema terkini (mis. dibuat
---   manual / dari DDL lama), tabel lama bisa KURANG kolom/index — gejalanya:
---     • Aktivasi lisensi gagal: "Invalid prisma.showroom.findUnique()
---       invocation" (Prisma men-SELECT semua kolom; bila ada kolom skema
---       yang tidak ada di tabel, query showroom langsung error — P2022)
---     • "P2022: The column ... does not exist in the current database"
---     • Slug duplikat terdeteksi meski seharusnya unik (index UNIQUE hilang)
---     • Gagal tambah/edit unit: "number of array dimensions (…) exceeds the
---       maximum allowed (6)" → kolom teks terlanjur bertipe array (text[])
+--   Bila database Supabase dibuat SEBELUM versi skema terkini, tabel lama
+--   bisa KURANG kolom/index — gejalanya:
+--     • Gagal tambah/edit motor: P2022 "column ... does not exist"
+--     • "number of array dimensions ... exceeds maximum allowed (6)"
+--       → kolom teks terlanjur bertipe array (text[])
+--     • Slug duplikat terdeteksi meski seharusnya unik
 --
--- ISI migrasi ini:
+-- ISI migrasi:
 --   1. CREATE TABLE IF NOT EXISTS  — tabel yang belum ada dibuat lengkap
 --   2. ALTER TABLE ADD COLUMN IF NOT EXISTS — kolom yang hilang ditambahkan
---      (aman untuk tabel yang sudah berisi data: kolom teks wajib diberi
---      default '', boolean/timestamp diberi default)
---   3. KOREKSI TIPE — kolom yang terlanjur bertipe ARRAY dikonversi ke TEXT
---      (array_to_json → format JSON persis yg diharapkan aplikasi)
---   4. CREATE [UNIQUE] INDEX IF NOT EXISTS — index & UNIQUE disamakan,
---     termasuk showrooms_slug_key (slug WAJIB unik — konsisten dengan
---      @unique pada prisma/schema.postgres.prisma)
---   5. FOREIGN KEY — ditambahkan hanya bila belum ada (DO block)
+--      (aman utk tabel berisi data: teks default '', timestamp default now)
+--   3. KOREKSI TIPE (DO block, per kolom, tidak akan gagal massal):
+--        ARRAY (text[] dll) → TEXT  via array_to_json()  — format JSON yg
+--          persis diharapkan aplikasi
+--        json / jsonb      → TEXT  via ::text
+--        text / varchar    → dibiarkan (sudah benar)
+--      HANYA kolom yang perlu yang disentuh → idempotent & tanpa error
+--      "function array_to_json(text) does not exist".
+--   4. Index & UNIQUE — dibuat bila belum ada; bila GAGAL karena data
+--      duplikat, migrasi TETAP LANJUT (hanya WARNING + cara perbaikannya).
+--   5. FOREIGN KEY — ditambahkan bila belum ada; bila gagal karena data
+--      yatim (orphan), migrasi TETAP LANJUT (WARNING saja).
+--   6. QUERY VERIFIKASI di akhir — hasilnya tampil di panel Results.
 --
--- AMAN dijalankan BERULANG (idempotent). Tidak ada data yang diubah/dihapus.
--- Cara pakai: Supabase Dashboard → SQL Editor → paste seluruh isi file → Run.
+-- AMAN dijalankan BERULANG (idempotent). Tidak ada data yang dihapus.
+-- Cara pakai: Supabase Dashboard → SQL Editor → paste SELURUH isi file → Run.
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -149,10 +152,7 @@ CREATE TABLE IF NOT EXISTS "bookings" (
 
 -- ------------------------------------------------------------
 -- 2) Kolom yang hilang pada tabel LAMA → ditambahkan
---    (no-op bila kolom sudah ada; default aman untuk tabel berisi data)
---    Catatan: kolom struktur inti (id, license_id, showroom_id, vehicle_id)
---    sengaja tidak di-ALTER — tabel lama pasti sudah memilikinya; bila
---    benar-benar tidak ada, tabel harus dibuat ulang dari schema.sql.
+--    (no-op bila kolom sudah ada; default aman utk tabel berisi data)
 -- ------------------------------------------------------------
 
 -- licenses
@@ -238,24 +238,23 @@ ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "expires_at" TIMESTAMP(3);
 ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 -- -----------------------------------------------------------
--- 3) KOREKSI TIPE KOLOM: array (text[] dll) → TEXT
---    Gejala yang diperbaiki: gagal tambah/edit unit dgn error
---      "number of array dimensions (…juta…) exceeds the maximum allowed (6)"
---    Penyebab: tabel lama (dibuat manual sebelum schema.sql ada) memiliki
---    kolom teks yang terlanjur bertipe ARRAY Postgres. Prisma mengirim nilai
---    sbg string (mis. JSON "[\"url\",…]") — Postgres men-decode binernya
---    sbg array → ndim terbaca byte acak → error 54000.
---    Konversi AMAN utk data: elemen array diubah ke JSON (array_to_json),
---    persis format yang diharapkan aplikasi (JSON array of string).
---    Idempotent: hanya menyentuh kolom yang datanya bertipe ARRAY.
+-- 3) KOREKSI TIPE KOLOM → TEXT (DO block, per kolom)
+--    • data_type = 'ARRAY'  (text[] dll) → array_to_json(col)::text
+--      (perbaiki gejala "number of array dimensions ... exceeds (6)")
+--    • data_type json/jsonb            → col::text
+--    • text / varchar / lainnya        → TIDAK disentuh (sudah aman)
+--    Hanya kolom yang benar-benar perlu yang di-ALTER, dan tiap kolom
+--    punya exception sendiri — satu kolom aneh tidak menggagalkan migrasi.
 -- -----------------------------------------------------------
 
 DO $$
 DECLARE
   r RECORD;
+  conv TEXT;
+  n INT := 0;
 BEGIN
   FOR r IN
-    SELECT c.table_name, c.column_name
+    SELECT c.table_name, c.column_name, c.data_type
     FROM information_schema.columns c
     JOIN (VALUES
       -- kolom yang SEHARUSNYA bertipe TEXT sesuai skema aplikasi
@@ -269,82 +268,134 @@ BEGIN
       ('bookings','marketing_name'),('bookings','marketing_phone'),('bookings','status')
     ) AS wanted(tbl, col)
       ON c.table_name = wanted.tbl AND c.column_name = wanted.col
-    WHERE c.data_type = 'ARRAY'
-      AND c.table_schema = 'public'
+    WHERE c.table_schema = 'public'
+      AND (c.data_type = 'ARRAY' OR c.data_type IN ('json','jsonb'))
   LOOP
-    EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT', r.table_name, r.column_name);
-    EXECUTE format(
-      'ALTER TABLE %I ALTER COLUMN %I TYPE TEXT USING (CASE WHEN %I IS NULL THEN NULL ELSE array_to_json(%I)::text END)',
-      r.table_name, r.column_name, r.column_name, r.column_name);
-    -- default kembali utk kolom JSON foto (sesuai skema Prisma)
-    IF r.table_name = 'vehicles' AND r.column_name IN ('photos','arrival_photos') THEN
-      EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT ''[]''', r.table_name, r.column_name);
+    IF r.data_type = 'ARRAY' THEN
+      conv := format(
+        'ALTER TABLE %I ALTER COLUMN %I TYPE TEXT USING (CASE WHEN %I IS NULL THEN NULL ELSE array_to_json(%I)::text END)',
+        r.table_name, r.column_name, r.column_name, r.column_name);
+    ELSE -- json / jsonb
+      conv := format(
+        'ALTER TABLE %I ALTER COLUMN %I TYPE TEXT USING (%I::text)',
+        r.table_name, r.column_name, r.column_name);
     END IF;
-    RAISE NOTICE 'Kolom %.% dikonversi dari ARRAY ke TEXT', r.table_name, r.column_name;
+    BEGIN
+      EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT', r.table_name, r.column_name);
+      EXECUTE conv;
+      -- default kembali utk kolom JSON foto (sesuai skema Prisma)
+      IF r.table_name = 'vehicles' AND r.column_name IN ('photos','arrival_photos') THEN
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT ''[]''', r.table_name, r.column_name);
+      END IF;
+      n := n + 1;
+      RAISE NOTICE 'OK: kolom %.% (%) dikonversi ke TEXT', r.table_name, r.column_name, r.data_type;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'Lewati %.% (%): %', r.table_name, r.column_name, r.data_type, SQLERRM;
+    END;
   END LOOP;
+  RAISE NOTICE 'Selesai koreksi tipe: % kolom dikonversi', n;
 END $$;
 
 -- ------------------------------------------------------------
 -- 4) Index & UNIQUE — disamakan dengan schema.postgres.prisma
---    Termasuk showrooms_slug_key: slug WAJIB unik (poin 3 permintaan —
---    atribut @unique slug kini juga ada di tabel Supabase, bukan hanya
---    di schema Prisma).
---    CATATAN: bila tabel lama sudah berisi slug duplikat, CREATE UNIQUE
---    INDEX akan gagal — bersihkan duplikat dulu (error akan menyebut
---    baris yang duplikat).
+--    GAGAL karena data duplikat TIDAK menggagalkan migrasi (WARNING saja):
+--    bila muncul WARNING duplikat, bersihkan data duplikat lalu Run ulang.
 -- ------------------------------------------------------------
 
-CREATE UNIQUE INDEX IF NOT EXISTS "licenses_license_key_key" ON "licenses"("license_key");
-CREATE UNIQUE INDEX IF NOT EXISTS "showrooms_license_id_key" ON "showrooms"("license_id");
-CREATE UNIQUE INDEX IF NOT EXISTS "showrooms_slug_key" ON "showrooms"("slug");
-CREATE UNIQUE INDEX IF NOT EXISTS "staff_accounts_showroom_id_username_key" ON "staff_accounts"("showroom_id", "username");
-CREATE UNIQUE INDEX IF NOT EXISTS "branches_showroom_id_name_key" ON "branches"("showroom_id", "name");
-CREATE UNIQUE INDEX IF NOT EXISTS "taxonomies_showroom_id_kind_name_key" ON "taxonomies"("showroom_id", "kind", "name");
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS "licenses_license_key_key" ON "licenses"("license_key");
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index licenses_license_key_key: % (cek duplikat license_key)', SQLERRM; END $$;
+
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS "showrooms_license_id_key" ON "showrooms"("license_id");
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index showrooms_license_id_key: % (cek duplikat license_id)', SQLERRM; END $$;
+
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS "showrooms_slug_key" ON "showrooms"("slug");
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index showrooms_slug_key: % (cek duplikat slug)', SQLERRM; END $$;
+
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS "staff_accounts_showroom_id_username_key" ON "staff_accounts"("showroom_id", "username");
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index staff_accounts_..._key: % (cek duplikat username)', SQLERRM; END $$;
+
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS "branches_showroom_id_name_key" ON "branches"("showroom_id", "name");
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index branches_..._key: % (cek duplikat nama cabang)', SQLERRM; END $$;
+
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS "taxonomies_showroom_id_kind_name_key" ON "taxonomies"("showroom_id", "kind", "name");
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index taxonomies_..._key: % (cek duplikat taxonomy — aman dihapus duplikatnya)', SQLERRM; END $$;
+
 CREATE INDEX IF NOT EXISTS "vehicles_showroom_id_status_idx" ON "vehicles"("showroom_id", "status");
 CREATE INDEX IF NOT EXISTS "vehicles_branch_id_idx" ON "vehicles"("branch_id");
-CREATE UNIQUE INDEX IF NOT EXISTS "marketings_showroom_id_phone_number_key" ON "marketings"("showroom_id", "phone_number");
+
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS "marketings_showroom_id_phone_number_key" ON "marketings"("showroom_id", "phone_number");
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index marketings_..._key: % (cek duplikat phone_number)', SQLERRM; END $$;
+
 CREATE INDEX IF NOT EXISTS "bookings_vehicle_id_status_idx" ON "bookings"("vehicle_id", "status");
 CREATE INDEX IF NOT EXISTS "bookings_marketing_id_idx" ON "bookings"("marketing_id");
 
 -- ------------------------------------------------------------
--- 5) FOREIGN KEY — hanya ditambahkan bila belum ada (idempotent)
+-- 5) FOREIGN KEY — hanya ditambahkan bila belum ada (idempotent);
+--    bila gagal karena data yatim/orphan → WARNING, migrasi lanjut.
 -- ------------------------------------------------------------
 
 DO $$ BEGIN
   ALTER TABLE "showrooms" ADD CONSTRAINT "showrooms_license_id_fkey" FOREIGN KEY ("license_id") REFERENCES "licenses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK showrooms_license_id_fkey: %', SQLERRM; END $$;
 
 DO $$ BEGIN
   ALTER TABLE "staff_accounts" ADD CONSTRAINT "staff_accounts_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK staff_accounts_showroom_id_fkey: %', SQLERRM; END $$;
 
 DO $$ BEGIN
   ALTER TABLE "branches" ADD CONSTRAINT "branches_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK branches_showroom_id_fkey: %', SQLERRM; END $$;
 
 DO $$ BEGIN
   ALTER TABLE "taxonomies" ADD CONSTRAINT "taxonomies_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK taxonomies_showroom_id_fkey: %', SQLERRM; END $$;
 
 DO $$ BEGIN
   ALTER TABLE "vehicles" ADD CONSTRAINT "vehicles_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK vehicles_showroom_id_fkey: %', SQLERRM; END $$;
 
 DO $$ BEGIN
   ALTER TABLE "vehicles" ADD CONSTRAINT "vehicles_branch_id_fkey" FOREIGN KEY ("branch_id") REFERENCES "branches"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK vehicles_branch_id_fkey: %', SQLERRM; END $$;
 
 DO $$ BEGIN
   ALTER TABLE "marketings" ADD CONSTRAINT "marketings_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK marketings_showroom_id_fkey: %', SQLERRM; END $$;
 
 DO $$ BEGIN
   ALTER TABLE "bookings" ADD CONSTRAINT "bookings_vehicle_id_fkey" FOREIGN KEY ("vehicle_id") REFERENCES "vehicles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK bookings_vehicle_id_fkey: %', SQLERRM; END $$;
 
 DO $$ BEGIN
   ALTER TABLE "bookings" ADD CONSTRAINT "bookings_marketing_id_fkey" FOREIGN KEY ("marketing_id") REFERENCES "marketings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN OTHERS THEN RAISE WARNING 'FK bookings_marketing_id_fkey: %', SQLERRM; END $$;
 
--- Selesai. Cek hasil (opsional): kolom tabel showrooms kini harus memuat
--- logo_url, header_url, maps_url + index UNIQUE showrooms_slug_key.
+-- ------------------------------------------------------------
+-- 6) VERIFIKASI — hasil tampil di panel Results setelah Run.
+--    Harapan: vehicles_kolom_baru_ok = 7, slug_unique_ok = 1,
+--             tipe_photos = text, tipe_arrival_photos = text
+--    (Bila semua sesuai → skema sudah sinkron; coba lagi aplikasinya.)
+-- ------------------------------------------------------------
+
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'vehicles'
+      AND column_name IN ('commission_amount','branch_id','purchased_at',
+                          'arrival_photos','sold_at','handover_photo','updated_at')
+  ) AS vehicles_kolom_baru_ok,
+  (SELECT count(*) FROM pg_indexes
+    WHERE schemaname = 'public' AND indexname = 'showrooms_slug_key'
+  ) AS slug_unique_ok,
+  (SELECT data_type FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'vehicles' AND column_name = 'photos'
+  ) AS tipe_photos,
+  (SELECT data_type FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'vehicles' AND column_name = 'arrival_photos'
+  ) AS tipe_arrival_photos;
