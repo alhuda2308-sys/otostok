@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   FileImage,
@@ -41,6 +42,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDateID, formatPhoneDisplay } from '@/lib/format'
 import { compressImage } from '@/lib/image-compress'
+import { ApiError, qk, useMarketingsQuery } from '@/lib/queries'
 import type { MarketingPartner } from '@/lib/types'
 
 export function AdminMarketingsClient({ slug }: { slug: string }) {
@@ -76,9 +78,13 @@ function MarketingsPage({
   slug: string
   session: { role: 'owner' | 'admin'; name: string; slug: string }
 }) {
-  const [partners, setPartners] = useState<MarketingPartner[]>([])
-  const [notFound, setNotFound] = useState(false)
-  const [loading, setLoading] = useState(true)
+  // Data via TanStack Query — daftar rekanan tampil instan dari cache saat kembali ke tab ini.
+  const marketingsQuery = useMarketingsQuery(slug)
+  const queryClient = useQueryClient()
+  const partners = marketingsQuery.data?.marketings ?? []
+  const loading = marketingsQuery.isPending
+  const notFound =
+    marketingsQuery.error instanceof ApiError && marketingsQuery.error.status === 404
 
   // Dialog tambah/edit
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -97,29 +103,16 @@ function MarketingsPage({
 
   const isOwner = session.role === 'owner'
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/${slug}/marketings`, { cache: 'no-store' })
-      if (res.status === 404) {
-        setNotFound(true)
-        return
-      }
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal memuat daftar rekanan.')
-      }
-      const j = (await res.json()) as { marketings: MarketingPartner[] }
-      setPartners(j.marketings)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Gagal memuat daftar rekanan.')
-    } finally {
-      setLoading(false)
-    }
-  }, [slug])
-
+  // Gagal memuat (selain 404) tetap diberi tahu via toast — perilaku sama seperti dulu.
   useEffect(() => {
-    load()
-  }, [load])
+    if (marketingsQuery.error && !notFound) {
+      toast.error(
+        marketingsQuery.error instanceof Error
+          ? marketingsQuery.error.message
+          : 'Gagal memuat daftar rekanan.',
+      )
+    }
+  }, [marketingsQuery.error, notFound])
 
   function openCreate() {
     setEditing(null)
@@ -204,7 +197,7 @@ function MarketingsPage({
           : `"${form.fullName.trim()}" terdaftar — nomor itu sekarang bisa membuka katalog.`,
       )
       setDialogOpen(false)
-      await load()
+      await queryClient.invalidateQueries({ queryKey: qk.marketings(slug) })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal menyimpan rekanan.')
     } finally {
@@ -227,7 +220,7 @@ function MarketingsPage({
           ? `${m.fullName} AKTIF — bisa akses katalog & tahan unit.`
           : `${m.fullName} dinonaktifkan — akses katalog nomornya diblokir.`,
       )
-      await load()
+      await queryClient.invalidateQueries({ queryKey: qk.marketings(slug) })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal mengubah status.')
     } finally {
@@ -245,7 +238,7 @@ function MarketingsPage({
       if (!res.ok) throw new Error(j.error || 'Gagal menghapus rekanan.')
       toast.success(j.message || `Rekanan "${deleteTarget.fullName}" dihapus.`)
       setDeleteTarget(null)
-      await load()
+      await queryClient.invalidateQueries({ queryKey: qk.marketings(slug) })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal menghapus rekanan.')
     }

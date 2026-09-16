@@ -53,7 +53,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     return NextResponse.json({ error: 'Belum login.' }, { status: 401 })
   }
 
-  const showroom = await db.showroom.findUnique({ where: { slug } })
+  // Select spesifik — showroom hanya dipakai untuk cek keberadaan + id.
+  const showroom = await db.showroom.findUnique({ where: { slug }, select: { id: true } })
   if (!showroom) {
     return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
   }
@@ -61,7 +62,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   const marketings = await db.marketing.findMany({
     where: { showroomId: showroom.id },
     orderBy: { createdAt: 'desc' },
-    include: {
+    // Select spesifik menggantikan include baris penuh — hanya kolom yang dipakai
+    // toInfo/statistik performa yang ditarik dari database.
+    select: {
+      id: true,
+      fullName: true,
+      phoneNumber: true,
+      addressCity: true,
+      notes: true,
+      isActive: true,
+      createdAt: true,
+      ktpPhotoUrl: true,
       bookings: {
         select: { status: true, vehicle: { select: { status: true } } },
       },
@@ -107,7 +118,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       )
     }
 
-    const showroom = await db.showroom.findUnique({ where: { slug } })
+    // Select spesifik — POST hanya butuh id + isActive (cek showroom aktif).
+    const showroom = await db.showroom.findUnique({
+      where: { slug },
+      select: { id: true, isActive: true },
+    })
     if (!showroom || !showroom.isActive) {
       return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
     }

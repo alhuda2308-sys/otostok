@@ -11,13 +11,24 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if (!session) {
     return NextResponse.json({ error: 'Akses ditolak — khusus owner.' }, { status: 403 })
   }
-  const showroom = await db.showroom.findUnique({ where: { slug } })
+  // Select spesifik — showroom hanya dipakai untuk cek keberadaan + id.
+  const showroom = await db.showroom.findUnique({ where: { slug }, select: { id: true } })
   if (!showroom) {
     return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
   }
   const rows = await db.staffAccount.findMany({
     where: { showroomId: showroom.id },
     orderBy: { createdAt: 'asc' },
+    // Select spesifik: passwordHash SENGAJA tidak ditarik dari DB — hash password
+    // tidak boleh keluar dari query daftar staf (keamanan) sekaligus payload lebih kecil.
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      role: true,
+      isActive: true,
+      createdAt: true,
+    },
   })
   const items: StaffAccountInfo[] = rows.map((r) => ({
     id: r.id,
@@ -45,7 +56,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     if (!session) {
       return NextResponse.json({ error: 'Akses ditolak — khusus owner.' }, { status: 403 })
     }
-    const showroom = await db.showroom.findUnique({ where: { slug } })
+    // Select spesifik — showroom hanya dipakai untuk cek keberadaan + id.
+    const showroom = await db.showroom.findUnique({ where: { slug }, select: { id: true } })
     if (!showroom) {
       return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Download, FileBarChart } from 'lucide-react'
 import {
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { downloadCsv, toCsv } from '@/lib/csv'
 import { formatDateID, formatDateISO, formatRupiah } from '@/lib/format'
-import type { ReportsResponse } from '@/lib/types'
+import { useReportsQuery } from '@/lib/queries'
 
 type Preset = 'today' | 'week' | 'month' | 'custom'
 
@@ -65,35 +65,19 @@ function ReportsPage({
   const [preset, setPreset] = useState<Preset>('month')
   const [customFrom, setCustomFrom] = useState(formatDateISO(new Date()))
   const [customTo, setCustomTo] = useState(formatDateISO(new Date()))
-  const [data, setData] = useState<ReportsResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   const range = useMemo(() => rangeFor(preset, customFrom, customTo), [preset, customFrom, customTo])
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(
-        `/api/admin/${slug}/reports?from=${range.from}T00:00:00&to=${range.to}T23:59:59`,
-        { cache: 'no-store' },
-      )
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal memuat laporan.')
-      }
-      setData(await res.json())
-      setError(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal memuat laporan.')
-    } finally {
-      setLoading(false)
-    }
-  }, [slug, range.from, range.to])
-
-  useEffect(() => {
-    load()
-  }, [load])
+  // Data via TanStack Query — keepPreviousData membuat perubahan preset tampil
+  // mulus (data rentang lama tetap tampil saat rentang baru dimuat), dan hasil
+  // per preset tersimpan di cache (pindah tab tidak memicu skeleton ulang).
+  const from = `${range.from}T00:00:00`
+  const to = `${range.to}T23:59:59`
+  const reportsQuery = useReportsQuery(slug, from, to)
+  const data = reportsQuery.data ?? null
+  const loading = reportsQuery.isPending && !data
+  const error =
+    reportsQuery.error instanceof Error && !data ? reportsQuery.error.message : null
 
   function exportCsv() {
     if (!data) return
@@ -208,7 +192,7 @@ function ReportsPage({
             <Button
               variant="outline"
               className="mt-3 h-10 border-red-300 text-xs font-bold"
-              onClick={load}
+              onClick={() => reportsQuery.refetch()}
             >
               Coba Lagi
             </Button>

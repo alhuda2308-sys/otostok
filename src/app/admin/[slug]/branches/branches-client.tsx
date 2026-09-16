@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Building2, ExternalLink, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
@@ -30,6 +31,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { ApiError, qk, useBranchesQuery } from '@/lib/queries'
 import type { BranchInfo } from '@/lib/types'
 
 export function AdminBranchesClient({ slug }: { slug: string }) {
@@ -55,9 +57,13 @@ function BranchesPage({
   slug: string
   session: { role: 'owner' | 'admin'; name: string; slug: string }
 }) {
-  const [branches, setBranches] = useState<BranchInfo[]>([])
-  const [notFound, setNotFound] = useState(false)
-  const [loading, setLoading] = useState(true)
+  // Data via TanStack Query — daftar cabang tampil instan dari cache saat kembali ke tab ini.
+  const branchesQuery = useBranchesQuery(slug)
+  const queryClient = useQueryClient()
+  const branches = branchesQuery.data?.branches ?? []
+  const loading = branchesQuery.isPending
+  const notFound =
+    branchesQuery.error instanceof ApiError && branchesQuery.error.status === 404
 
   // Dialog tambah/edit
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -70,29 +76,16 @@ function BranchesPage({
 
   const isOwner = session.role === 'owner'
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/${slug}/branches`, { cache: 'no-store' })
-      if (res.status === 404) {
-        setNotFound(true)
-        return
-      }
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal memuat daftar cabang.')
-      }
-      const j = (await res.json()) as { branches: BranchInfo[] }
-      setBranches(j.branches)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Gagal memuat daftar cabang.')
-    } finally {
-      setLoading(false)
-    }
-  }, [slug])
-
+  // Gagal memuat (selain 404) tetap diberi tahu via toast — perilaku sama seperti dulu.
   useEffect(() => {
-    load()
-  }, [load])
+    if (branchesQuery.error && !notFound) {
+      toast.error(
+        branchesQuery.error instanceof Error
+          ? branchesQuery.error.message
+          : 'Gagal memuat daftar cabang.',
+      )
+    }
+  }, [branchesQuery.error, notFound])
 
   function openCreate() {
     setEditing(null)
@@ -143,7 +136,7 @@ function BranchesPage({
           : `Cabang "${form.name.trim()}" ditambahkan — dropdown lokasi otomatis aktif di form motor.`,
       )
       setDialogOpen(false)
-      await load()
+      await queryClient.invalidateQueries({ queryKey: qk.branches(slug) })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal menyimpan cabang.')
     } finally {
@@ -161,7 +154,7 @@ function BranchesPage({
         j.message || `Cabang "${deleteTarget.name}" dihapus.`,
       )
       setDeleteTarget(null)
-      await load()
+      await queryClient.invalidateQueries({ queryKey: qk.branches(slug) })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal menghapus cabang.')
     }

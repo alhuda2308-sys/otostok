@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
 import { AppFooter } from '@/components/app-footer'
+import { QueryProvider } from '@/components/query-provider'
 
 export const metadata: Metadata = {
   title: {
@@ -36,7 +37,7 @@ export default function RootLayout({
     <html lang="id" suppressHydrationWarning>
       <body className="bg-slate-50 font-sans text-slate-900 antialiased">
         <div className="flex min-h-screen flex-col">
-          {children}
+          <QueryProvider>{children}</QueryProvider>
           <AppFooter />
         </div>
         <Toaster position="top-center" richColors closeButton />

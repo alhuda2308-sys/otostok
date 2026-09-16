@@ -17,7 +17,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     if (!session) {
       return NextResponse.json({ error: 'Belum login.' }, { status: 401 })
     }
-    const showroom = await db.showroom.findUnique({ where: { slug } })
+    // Select spesifik — showroom hanya dipakai untuk cek keberadaan + id.
+    const showroom = await db.showroom.findUnique({ where: { slug }, select: { id: true } })
     if (!showroom) {
       return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
     }
@@ -41,6 +42,23 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
         soldAt: { gte: from, lte: toEnd },
       },
       orderBy: { soldAt: 'desc' },
+      // Select spesifik: kolom berat yang TIDAK dipakai laporan (arrivalPhotos,
+      // handoverPhoto, arrivalNotes, notes, odometer, color, dst.) tidak ditarik —
+      // payload & memori jauh lebih kecil pada riwayat penjualan besar.
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        licensePlate: true,
+        soldAt: true,
+        createdAt: true,
+        soldPrice: true,
+        sellingPrice: true,
+        commissionAmount: true,
+        basePrice: true,
+        soldBy: true,
+        photos: true,
+      },
     })
 
     const isOwner = session.role === 'owner'

@@ -4,15 +4,6 @@ import { parsePhotos } from './holds'
 
 type HoldInfo = { marketingName: string; expiresAt: Date } | null
 /**
- * Vehicle + relasi branch yang DIPERSEMPIT ke 4 kolom yang tampil di UI.
- * Kompatibel untuk baris penuh (include: { branch: true }) maupun
- * include dengan select bersarang (id/name/address/mapsUrl saja).
- */
-type VehicleWithBranch = Vehicle & {
-  branch?: Pick<Branch, 'id' | 'name' | 'address' | 'mapsUrl'> | null
-}
-
-/**
  * Bentuk minimal yang dibutuhkan kartu katalog publik.
  * API publik memakai `select` persis seperti ini supaya kolom berat yang
  * tidak perlu (basePrice, arrivalPhotos, sold*, handoverPhoto, showroomId)
@@ -38,6 +29,22 @@ export type PublicVehicleSource = Pick<
   | 'createdAt'
   | 'updatedAt'
 > & { branch?: Pick<Branch, 'id' | 'name' | 'address' | 'mapsUrl'> | null }
+
+/**
+ * Bentuk struktural yang dibutuhkan toAdminVehicle — hasil `select` eksplisit
+ * route inventory (BUKAN include baris penuh). Kolom showroomId sengaja tidak
+ * ditarik; skema baru otomatis tidak ikut terbawa ke payload.
+ */
+export type AdminVehicleSource = PublicVehicleSource & {
+  basePrice: number | null
+  purchasedAt: Date | null
+  arrivalNotes: string | null
+  arrivalPhotos: string | null
+  soldAt: Date | null
+  soldPrice: number | null
+  soldBy: string | null
+  handoverPhoto: string | null
+}
 
 function toBranchInfo(b: Pick<Branch, 'id' | 'name' | 'address' | 'mapsUrl'> | null | undefined): PublicVehicle['branch'] {
   return b ? { id: b.id, name: b.name, address: b.address, mapsUrl: b.mapsUrl } : null
@@ -80,9 +87,11 @@ export function toPublicVehicle(v: PublicVehicleSource, activeHold: HoldInfo): P
 /**
  * Mapper vehicle -> bentuk admin/dashboard (lengkap termasuk harga modal & mutasi).
  * `withSensitive=false` untuk role admin: modal disembunyikan.
+ * Param struktural (AdminVehicleSource): menerima hasil `select` eksplisit
+ * route inventory maupun baris penuh Prisma (create/update di route vehicle).
  */
 export function toAdminVehicle(
-  v: VehicleWithBranch,
+  v: AdminVehicleSource,
   activeHold: HoldInfo,
   withSensitive = true,
 ): AdminVehicle {

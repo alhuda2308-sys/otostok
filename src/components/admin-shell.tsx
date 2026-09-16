@@ -1,38 +1,26 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { Bike, Building2, ClipboardList, FileBarChart, LayoutDashboard, LogOut, Megaphone, Settings, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppIcon } from '@/components/app-icon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { qk, useSessionQuery, type AdminSession } from '@/lib/queries'
 import type { SessionResponse, StaffRole } from '@/lib/types'
 
-export interface AdminSession {
-  role: StaffRole
-  name: string
-  slug: string
-}
-
-/** Cek sesi login via API. */
-export async function fetchSession(): Promise<AdminSession | null> {
-  try {
-    const res = await fetch('/api/auth/session', { cache: 'no-store' })
-    if (!res.ok) return null
-    const j = (await res.json()) as SessionResponse
-    return j.session
-  } catch {
-    return null
-  }
-}
+export type { AdminSession } from '@/lib/queries'
 
 /**
  * Gate halaman admin: wajib login (owner/admin).
  * Belum login -> tampilkan kartu login inline.
  * Sesi milik showroom lain -> dianggap belum login.
+ * Sesi dicek via TanStack Query (cache 5 menit) — pindah antar-tab admin
+ * tidak lagi menampilkan skeleton "Memeriksa sesi..." berulang.
  */
 export function AdminGate({
   slug,
@@ -41,15 +29,9 @@ export function AdminGate({
   slug: string
   children: (session: AdminSession) => React.ReactNode
 }) {
-  const [session, setSession] = useState<AdminSession | null | 'loading'>('loading')
+  const { data, isPending } = useSessionQuery()
 
-  useEffect(() => {
-    fetchSession().then((s) => {
-      setSession(s && s.slug === slug ? s : null)
-    })
-  }, [slug])
-
-  if (session === 'loading') {
+  if (isPending) {
     return (
       <div className="mx-auto w-full max-w-md flex-1 space-y-3 px-4 py-10">
         <div className="h-40 animate-pulse rounded-lg bg-slate-200" />
@@ -57,7 +39,19 @@ export function AdminGate({
     )
   }
 
-  if (!session) return <LoginCard slug={slug} onSuccess={setSession} />
+  const session =
+    data?.session && data.session.slug === slug ? (data.session as AdminSession) : null
+
+  if (!session)
+    return (
+      <LoginCard
+        slug={slug}
+        onSuccess={() => {
+          // Tidak perlu setState — LoginCard sudah menulis sesi ke cache
+          // (setQueryData), AdminGate otomatis render ulang dari cache.
+        }}
+      />
+    )
 
   return <>{children(session)}</>
 }
@@ -74,6 +68,7 @@ function LoginCard({
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const queryClient = useQueryClient()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -88,6 +83,14 @@ function LoginCard({
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Login gagal.')
       toast.success(`Selamat bekerja, ${j.session.name}!`)
+      // Prime cache: tulis sesi baru dulu (observer aktif langsung render dari
+      // cache), LALU buang cache data milik sesi/showroom sebelumnya.
+      // Urutan penting: queryClient.clear() menghapus query ['session'] yang
+      // sedang di-observe dan membuat gate macet di kartu login.
+      queryClient.setQueryData(qk.session, j as SessionResponse)
+      queryClient.removeQueries({
+        predicate: (q) => q.queryKey[0] !== 'session',
+      })
       onSuccess(j.session as AdminSession)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login gagal.')
@@ -229,9 +232,11 @@ export function AdminNav({ slug, role }: { slug: string; role: StaffRole }) {
           const active =
             it.href === base ? pathname === base : pathname.startsWith(it.href)
           return (
+            // prefetch penuh rute admin — pindah tab terasa instan
             <Link
               key={it.href}
               href={it.href}
+              prefetch={true}
               aria-current={active ? 'page' : undefined}
               className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-extrabold ${
                 active

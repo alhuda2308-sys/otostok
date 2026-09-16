@@ -20,41 +20,93 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   }
   const isOwner = session.role === 'owner'
 
-  const showroom = await db.showroom.findUnique({ where: { slug }, include: { license: true } })
+  const showroom = await db.showroom.findUnique({
+    where: { slug },
+    // Select spesifik — hindari tarik baris penuh (licenseId/createdAt tidak
+    // dipakai dashboard). Lisensi dipersempit ke 5 kolom yang dikirim.
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      address: true,
+      ownerPhone: true,
+      logoUrl: true,
+      headerUrl: true,
+      mapsUrl: true,
+      isActive: true,
+      license: {
+        select: {
+          licenseKey: true,
+          planType: true,
+          maxVehicles: true,
+          status: true,
+          expiresAt: true,
+        },
+      },
+    },
+  })
   if (!showroom || !showroom.isActive) {
     return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
   }
 
   await cleanupExpiredHolds(showroom.id)
 
-  const vehicles = await db.vehicle.findMany({
-    where: { showroomId: showroom.id },
-    orderBy: { createdAt: 'desc' },
-    // Baris vehicle utuh (dipakai toAdminVehicle); relasi branch cukup 4 kolom
-    // yang tampil di UI — hemat payload pada stok besar.
-    include: { branch: { select: { id: true, name: true, address: true, mapsUrl: true } } },
-  })
-
-  // Cabang showroom — dipakai filter dashboard & dropdown lokasi di form unit
-  const branches = await db.branch.findMany({
-    where: { showroomId: showroom.id },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true, name: true, address: true, mapsUrl: true },
-  })
-
-  const bookings = await db.booking.findMany({
-    where: { vehicle: { showroomId: showroom.id } },
-    orderBy: { expiresAt: 'desc' },
-    select: {
-      id: true,
-      vehicleId: true,
-      marketingId: true,
-      marketingName: true,
-      marketingPhone: true,
-      status: true,
-      expiresAt: true,
-    },
-  })
+  // Tiga query independen dijalankan paralel — latency dashboard = query terlambat
+  // yang tercepat, bukan jumlah ketiganya.
+  const [vehicles, branches, bookings] = await Promise.all([
+    db.vehicle.findMany({
+      where: { showroomId: showroom.id },
+      orderBy: { createdAt: 'desc' },
+      // Select persis AdminVehicleSource (lihat lib/mappers.ts): semua kolom yang
+      // dipakai kartu dashboard/dialog edit/mutasi — TANPA kolom showroomId.
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        category: true,
+        year: true,
+        licensePlate: true,
+        color: true,
+        odometer: true,
+        taxStatus: true,
+        documentStatus: true,
+        sellingPrice: true,
+        basePrice: true,
+        commissionAmount: true,
+        status: true,
+        photos: true,
+        notes: true,
+        purchasedAt: true,
+        arrivalNotes: true,
+        arrivalPhotos: true,
+        soldAt: true,
+        soldPrice: true,
+        soldBy: true,
+        handoverPhoto: true,
+        createdAt: true,
+        updatedAt: true,
+        branch: { select: { id: true, name: true, address: true, mapsUrl: true } },
+      },
+    }),
+    db.branch.findMany({
+      where: { showroomId: showroom.id },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, address: true, mapsUrl: true },
+    }),
+    db.booking.findMany({
+      where: { vehicle: { showroomId: showroom.id } },
+      orderBy: { expiresAt: 'desc' },
+      select: {
+        id: true,
+        vehicleId: true,
+        marketingId: true,
+        marketingName: true,
+        marketingPhone: true,
+        status: true,
+        expiresAt: true,
+      },
+    }),
+  ])
 
   const vehicleById = new Map(vehicles.map((v) => [v.id, v]))
   const now = Date.now()

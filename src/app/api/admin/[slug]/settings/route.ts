@@ -17,7 +17,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     if (!session) {
       return NextResponse.json({ error: 'Akses ditolak — khusus owner.' }, { status: 403 })
     }
-    const showroom = await db.showroom.findUnique({ where: { slug } })
+    // Select spesifik — persis 7 field profil yang dikirim ke klien.
+    const showroom = await db.showroom.findUnique({
+      where: { slug },
+      select: {
+        name: true,
+        slug: true,
+        address: true,
+        ownerPhone: true,
+        logoUrl: true,
+        headerUrl: true,
+        mapsUrl: true,
+      },
+    })
     if (!showroom) {
       return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
     }
@@ -49,7 +61,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     if (!session) {
       return NextResponse.json({ error: 'Akses ditolak — khusus owner.' }, { status: 403 })
     }
-    const showroom = await db.showroom.findUnique({ where: { slug } })
+    // Select spesifik — showroom hanya dipakai untuk cek keberadaan + id update.
+    const showroom = await db.showroom.findUnique({ where: { slug }, select: { id: true } })
     if (!showroom) {
       return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
     }

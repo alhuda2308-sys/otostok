@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Save } from 'lucide-react'
 import {
@@ -14,16 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { normalizePhone } from '@/lib/format'
-
-interface SettingsData {
-  name: string
-  slug: string
-  address: string
-  ownerPhone: string
-  logoUrl: string | null
-  headerUrl: string | null
-  mapsUrl: string | null
-}
+import { ApiError, qk, useSettingsQuery } from '@/lib/queries'
 
 export function AdminSettingsClient({ slug }: { slug: string }) {
   return (
@@ -40,9 +32,19 @@ function SettingsPage({
   slug: string
   session: { role: 'owner' | 'admin'; name: string; slug: string }
 }) {
-  const [data, setData] = useState<SettingsData | null>(null)
-  const [notFound, setNotFound] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // Data via TanStack Query — profil showroom tampil instan dari cache saat
+  // kembali ke tab Pengaturan.
+  const settingsQuery = useSettingsQuery(slug)
+  const queryClient = useQueryClient()
+  const data = settingsQuery.data ?? null
+  const notFound =
+    settingsQuery.error instanceof ApiError && settingsQuery.error.status === 404
+  const error =
+    settingsQuery.error && !notFound
+      ? settingsQuery.error instanceof Error
+        ? settingsQuery.error.message
+        : 'Gagal memuat pengaturan.'
+      : null
 
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
@@ -52,33 +54,20 @@ function SettingsPage({
   const [header, setHeader] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/${slug}/settings`, { cache: 'no-store' })
-      if (res.status === 404) {
-        setNotFound(true)
-        return
-      }
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal memuat pengaturan.')
-      }
-      const j = (await res.json()) as SettingsData
-      setData(j)
-      setName(j.name)
-      setAddress(j.address)
-      setOwnerPhone(j.ownerPhone)
-      setMapsUrl(j.mapsUrl ?? '')
-      setLogo(j.logoUrl ? [j.logoUrl] : [])
-      setHeader(j.headerUrl ? [j.headerUrl] : [])
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal memuat pengaturan.')
-    }
-  }, [slug])
-
+  // One-shot hydration: isi form sekali dari cache pertama, jadi refetch
+  // background tidak pernah menimpa editan user yang belum disimpan.
+  const hydrated = useRef(false)
   useEffect(() => {
-    load()
-  }, [load])
+    if (data && !hydrated.current) {
+      hydrated.current = true
+      setName(data.name)
+      setAddress(data.address)
+      setOwnerPhone(data.ownerPhone)
+      setMapsUrl(data.mapsUrl ?? '')
+      setLogo(data.logoUrl ? [data.logoUrl] : [])
+      setHeader(data.headerUrl ? [data.headerUrl] : [])
+    }
+  }, [data])
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -103,6 +92,8 @@ function SettingsPage({
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Gagal menyimpan pengaturan.')
+      // Segarkan cache pengaturan agar data tersimpan dipakai saat kunjungan berikutnya.
+      await queryClient.invalidateQueries({ queryKey: qk.settings(slug) })
       toast.success('Pengaturan tersimpan — katalog publik langsung diperbarui.')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal menyimpan pengaturan.')

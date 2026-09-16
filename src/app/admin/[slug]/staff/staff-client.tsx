@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Copy, Plus, Trash2, UserRound } from 'lucide-react'
 import {
@@ -31,6 +32,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { copyToClipboard, formatDateID } from '@/lib/format'
+import { ApiError, qk, useStaffQuery } from '@/lib/queries'
 import type { StaffAccountInfo } from '@/lib/types'
 
 export function AdminStaffClient({ slug }: { slug: string }) {
@@ -48,10 +50,18 @@ function StaffPage({
   slug: string
   session: { role: 'owner' | 'admin'; name: string; slug: string }
 }) {
-  const [items, setItems] = useState<StaffAccountInfo[] | null>(null)
-  const [notFound, setNotFound] = useState(false)
-  const [denied, setDenied] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // Data via TanStack Query — daftar akun tampil instan dari cache saat kembali ke tab ini.
+  const staffQuery = useStaffQuery(slug)
+  const queryClient = useQueryClient()
+  const items = staffQuery.data?.items ?? null
+  const denied = staffQuery.error instanceof ApiError && staffQuery.error.status === 403
+  const notFound = staffQuery.error instanceof ApiError && staffQuery.error.status === 404
+  const error =
+    staffQuery.error && !denied && !notFound
+      ? staffQuery.error instanceof Error
+        ? staffQuery.error.message
+        : 'Gagal memuat daftar staf.'
+      : null
 
   const [createOpen, setCreateOpen] = useState(false)
   const [created, setCreated] = useState<{ name: string; username: string; password: string } | null>(
@@ -59,27 +69,6 @@ function StaffPage({
   )
   const [deleteTarget, setDeleteTarget] = useState<StaffAccountInfo | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/${slug}/staff`, { cache: 'no-store' })
-      if (res.status === 404) return setNotFound(true)
-      if (res.status === 403) return setDenied(true)
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal memuat daftar staf.')
-      }
-      const j = await res.json()
-      setItems(j.items)
-      setError(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal memuat daftar staf.')
-    }
-  }, [slug])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   async function toggleActive(s: StaffAccountInfo) {
     setBusyId(s.id)
@@ -96,7 +85,7 @@ function StaffPage({
           ? `Akun ${s.name} diaktifkan.`
           : `Akun ${s.name} dinonaktifkan — tidak bisa login.`,
       )
-      await load()
+      await queryClient.invalidateQueries({ queryKey: qk.staff(slug) })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal mengubah status akun.')
     } finally {
@@ -113,7 +102,7 @@ function StaffPage({
       if (!res.ok) throw new Error(j.error || 'Gagal menghapus akun.')
       toast.success(`Akun ${deleteTarget.name} dihapus.`)
       setDeleteTarget(null)
-      await load()
+      await queryClient.invalidateQueries({ queryKey: qk.staff(slug) })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal menghapus akun.')
     } finally {
@@ -230,7 +219,7 @@ function StaffPage({
         onCreated={(c) => {
           setCreateOpen(false)
           setCreated(c)
-          load()
+          queryClient.invalidateQueries({ queryKey: qk.staff(slug) })
         }}
       />
 

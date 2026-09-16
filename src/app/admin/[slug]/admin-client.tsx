@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   Copy,
@@ -25,8 +27,6 @@ import {
   SessionBadge,
   ShowroomNotFound,
 } from '@/components/admin-shell'
-import { SellDialog } from '@/components/sell-dialog'
-import { WABroadcastDialog } from '@/components/wa-broadcast-dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,13 +54,23 @@ import {
   isTaxAlive,
   waLink,
 } from '@/lib/format'
-import type {
-  AdminInventoryResponse,
-  AdminVehicle,
-  TaxonomyResponse,
-  VehicleStatus,
-} from '@/lib/types'
-import { VehicleForm } from './vehicle-form'
+import { ApiError, qk, useInventoryQuery, useTaxonomyQuery } from '@/lib/queries'
+import type { AdminVehicle, VehicleStatus } from '@/lib/types'
+
+// Komponen berat dimuat terpisah (code-split) — JS form/modal tidak
+// memblokir render pertama dashboard.
+const VehicleForm = dynamic(
+  () => import('./vehicle-form').then((m) => ({ default: m.VehicleForm })),
+  { ssr: false },
+)
+const SellDialog = dynamic(
+  () => import('@/components/sell-dialog').then((m) => ({ default: m.SellDialog })),
+  { ssr: false },
+)
+const WABroadcastDialog = dynamic(
+  () => import('@/components/wa-broadcast-dialog').then((m) => ({ default: m.WABroadcastDialog })),
+  { ssr: false },
+)
 
 const STATUS_TONE: Record<VehicleStatus, string> = {
   available: 'bg-emerald-600 text-white',
@@ -83,12 +93,24 @@ function Dashboard({
   slug: string
   session: { role: 'owner' | 'admin'; name: string; slug: string }
 }) {
-  const [data, setData] = useState<AdminInventoryResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [notFound, setNotFound] = useState(false)
+  // Data via TanStack Query — cache dibagi dengan halaman Mutasi, jadi pindah
+  // tab menampilkan data instan dari memori (stale-while-revalidate).
+  const inventoryQuery = useInventoryQuery(slug)
+  const taxonomyQuery = useTaxonomyQuery(slug)
+  const queryClient = useQueryClient()
 
-  const [taxonomy, setTaxonomy] = useState<TaxonomyResponse | null>(null)
+  const data = inventoryQuery.data ?? null
+  const loading = inventoryQuery.isPending
+  const notFound =
+    inventoryQuery.error instanceof ApiError && inventoryQuery.error.status === 404
+  const loadError =
+    inventoryQuery.error && !notFound
+      ? inventoryQuery.error instanceof Error
+        ? inventoryQuery.error.message
+        : 'Gagal memuat data.'
+      : null
+  const taxonomy = taxonomyQuery.data ?? null
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | VehicleStatus>('all')
   const [brandFilter, setBrandFilter] = useState('all')
@@ -106,40 +128,10 @@ function Dashboard({
 
   const isOwner = session.role === 'owner'
 
-  const refetch = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/${slug}/inventory`, { cache: 'no-store' })
-      if (res.status === 404) {
-        setNotFound(true)
-        return
-      }
-      if (res.status === 401) {
-        window.location.reload()
-        return
-      }
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal memuat data.')
-      }
-      setData(await res.json())
-      setLoadError(null)
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : 'Gagal memuat data.')
-    } finally {
-      setLoading(false)
-    }
-  }, [slug])
-
-  useEffect(() => {
-    refetch()
-  }, [refetch])
-
-  useEffect(() => {
-    fetch(`/api/admin/${slug}/taxonomy`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => j && setTaxonomy(j))
-      .catch(() => {})
-  }, [slug])
+  // Refresh = invalidate cache inventory (refetch background, data lama tetap tampil).
+  const refreshInventory = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: qk.inventory(slug) })
+  }, [queryClient, slug])
 
   const filtered = useMemo(() => {
     if (!data) return []
@@ -170,7 +162,7 @@ function Dashboard({
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Gagal mengubah status.')
       toast.success(`"${v.brand} ${v.model}" sekarang ${STATUS_LABELS[status].toLowerCase()}.`)
-      await refetch()
+      await refreshInventory()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal mengubah status.')
     } finally {
@@ -200,7 +192,7 @@ function Dashboard({
       }
       toast.success(`"${deleteTarget.brand} ${deleteTarget.model}" dihapus dari stok.`)
       setDeleteTarget(null)
-      await refetch()
+      await refreshInventory()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal menghapus unit.')
     } finally {
@@ -296,10 +288,7 @@ function Dashboard({
             <Button
               variant="outline"
               className="mt-3 h-10 border-red-300 text-xs font-bold"
-              onClick={() => {
-                setLoading(true)
-                refetch()
-              }}
+              onClick={() => refreshInventory()}
             >
               Coba Lagi
             </Button>
@@ -432,7 +421,7 @@ function Dashboard({
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
                         <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-extrabold tabular-nums text-amber-800">
-                          <Countdown expiresAt={h.expiresAt} onDone={() => refetch()} />
+                          <Countdown expiresAt={h.expiresAt} onDone={() => refreshInventory()} />
                         </span>
                         <Button
                           size="sm"
@@ -598,12 +587,12 @@ function Dashboard({
           slug={slug}
           open={formOpen}
           onOpenChange={setFormOpen}
-          onSaved={refetch}
+          onSaved={refreshInventory}
           editing={editing}
           taxonomy={taxonomy}
           canSeeBasePrice={isOwner}
           branches={data.branches}
-          onTaxonomyChanged={setTaxonomy}
+          onTaxonomyChanged={(t) => queryClient.setQueryData(qk.taxonomy(slug), t)}
         />
       )}
 
@@ -614,7 +603,7 @@ function Dashboard({
         onOpenChange={(o) => !o && setSellTarget(null)}
         onSold={(v) => {
           setSellTarget(null)
-          refetch()
+          refreshInventory()
           setWaTarget({ vehicle: v, kind: 'sold' })
         }}
       />

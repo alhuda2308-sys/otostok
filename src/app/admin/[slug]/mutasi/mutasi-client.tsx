@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowDownToLine, ArrowUpFromLine, ClipboardList, Pencil } from 'lucide-react'
 import {
@@ -25,6 +26,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDateID, formatDateISO, formatRupiah } from '@/lib/format'
+import { ApiError, qk, useInventoryQuery } from '@/lib/queries'
 import type { AdminVehicle } from '@/lib/types'
 
 export function AdminMutasiClient({ slug }: { slug: string }) {
@@ -43,30 +45,19 @@ function MutasiPage({
   session: { role: 'owner' | 'admin'; name: string; slug: string }
 }) {
   const [tab, setTab] = useState<'in' | 'out'>('in')
-  const [vehicles, setVehicles] = useState<AdminVehicle[] | null>(null)
-  const [notFound, setNotFound] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // Shared cache dengan Dashboard — pindah tab menampilkan data instan.
+  const inventoryQuery = useInventoryQuery(slug)
+  const queryClient = useQueryClient()
+  const vehicles = inventoryQuery.data?.vehicles ?? null
+  const notFound =
+    inventoryQuery.error instanceof ApiError && inventoryQuery.error.status === 404
+  const error =
+    inventoryQuery.error && !notFound
+      ? inventoryQuery.error instanceof Error
+        ? inventoryQuery.error.message
+        : 'Gagal memuat data mutasi.'
+      : null
   const [editTarget, setEditTarget] = useState<AdminVehicle | null>(null)
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/${slug}/inventory`, { cache: 'no-store' })
-      if (res.status === 404) return setNotFound(true)
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'Gagal memuat data mutasi.')
-      }
-      const j = await res.json()
-      setVehicles(j.vehicles)
-      setError(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal memuat data mutasi.')
-    }
-  }, [slug])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   const masukList = useMemo(
     () =>
@@ -133,7 +124,7 @@ function MutasiPage({
             <Button
               variant="outline"
               className="mt-3 h-10 border-red-300 text-xs font-bold"
-              onClick={load}
+              onClick={() => inventoryQuery.refetch()}
             >
               Coba Lagi
             </Button>
@@ -268,7 +259,8 @@ function MutasiPage({
           onOpenChange={(o) => !o && setEditTarget(null)}
           onSaved={() => {
             setEditTarget(null)
-            load()
+            // Invalidate cache inventory — Dashboard & Mutasi sama-sama diperbarui.
+            queryClient.invalidateQueries({ queryKey: qk.inventory(slug) })
           }}
         />
       )}

@@ -589,3 +589,72 @@ Stage Summary:
 - Jalur data katalog tidak lagi menarik kolom berat (arrival/sold/basePrice) → payload & memori lebih kecil; foto kartu kini WebP/AVIF teroptimasi Vercel.
 - Keamanan: basePrice tetap tak pernah keluar di jalur publik (diverifikasi: tidak ada key basePrice di respons API publik), whitelist gating lolos regresi.
 - Trade-off sadar: perubahan stok baru terlihat di SSR shell maksimal 60 detik (sesuai permintaan revalidate=60); klien tetap auto-refresh 30 dtk sehingga data layar selalu segar.
+
+---
+Task ID: perf2-a
+Agent: general-purpose (API optimization)
+Task: Optimasi query Prisma API dashboard OtoStok — select spesifik di semua findMany/findUnique admin routes + Promise.all paralel di inventory (bentuk respons JSON 100% identik).
+
+Work Log:
+- Membaca worklog.md (konteks perf-optimization-round1: Cache-Control & select sudah sebagian ada) + prisma/schema.prisma untuk nama kolom persis.
+- src/lib/mappers.ts: hapus type lokal `VehicleWithBranch`, ganti dengan `export type AdminVehicleSource = PublicVehicleSource & { basePrice, purchasedAt, arrivalNotes, arrivalPhotos, soldAt, soldPrice, soldBy, handoverPhoto }` — tipe struktural hasil select eksplisit (showroomId tidak ditarik). `toAdminVehicle(v: AdminVehicleSource, ...)`; baris penuh Prisma (create/update di route vehicles tetap kompatibel secara struktural). Import `Vehicle` TETAP ada karena `Pick<Vehicle, ...>` di PublicVehicleSource masih memakainya (kondisi "hapus bila tak terpakai" tidak berlaku). Grep konfirmasi tidak ada file lain yang memakai VehicleWithBranch.
+- src/app/api/admin/[slug]/inventory/route.ts: (a) showroom.findUnique include license:true → select spesifik 9 field + license { licenseKey, planType, maxVehicles, status, expiresAt }; (b) setelah cleanupExpiredHolds, 3 query independen (vehicle.findMany 26 kolom + branch select 4 kolom, branch.findMany select 4 kolom, booking.findMany select 7 kolom) digabung dalam SATU Promise.all — sebelumnya 3 query berurutan; (c) sisanya (holds, stats, licenseEffective, build respons, Cache-Control) tidak disentuh.
+- src/app/api/admin/[slug]/reports/route.ts: showroom findUnique → select { id }; vehicle.findMany (full row) → select 12 kolom (id, brand, model, licensePlate, soldAt, createdAt, soldPrice, sellingPrice, commissionAmount, basePrice, soldBy, photos) — kolom berat arrivalPhotos/handoverPhoto/arrivalNotes/notes/odometer/color/dll. tidak ditarik lagi.
+- src/app/api/admin/[slug]/taxonomy/route.ts: GET showroom → select { id }, taxonomy.findMany → select { kind, name }; POST showroom → select { id }, dup-check taxonomy.findUnique → select { id } (goal: semua findUnique ber-select).
+- src/app/api/admin/[slug]/staff/route.ts: GET showroom → select { id }; staffAccount.findMany → select { id, name, username, role, isActive, createdAt } — passwordHash TIDAK lagi ditarik dari DB (keamanan + payload); POST showroom → select { id }.
+- src/app/api/admin/[slug]/settings/route.ts: GET showroom → select persis 7 field profil yang dikirim; PATCH showroom → select { id } (row hanya untuk existence + id update; logika update tidak berubah).
+- src/app/api/admin/[slug]/branches/route.ts: GET showroom → select { id }, branch.findMany → select { id, name, address, mapsUrl }; POST showroom → select { id, isActive } (handler mengecek !showroom.isActive, jadi isActive wajib ikut).
+- src/app/api/admin/[slug]/marketings/route.ts: GET showroom → select { id }; marketing.findMany include → select eksplisit 8 kolom + bookings { select: { status, vehicle { select: { status } } } }; toInfo param struktural tetap typecheck; POST showroom → select { id, isActive }.
+- Verifikasi: bunx tsc --noEmit → 0 error di src/ (sisa error pre-existing di skills/ & examples/ bukan bagian proyek); bun run lint bersih; grep: 8/8 findMany di 7 route punya select, Cache-Control utuh di 7 file, Promise.all ada di inventory, tidak ada lagi include baris penuh di route cakupan, tidak ada referensi VehicleWithBranch.
+
+Stage Summary:
+- 7 admin route dioptimasi: semua findMany/findUnique kini select spesifik; inventory menjalankan vehicles+branches+bookings paralel via Promise.all (latency dashboard = query terlambat, bukan jumlah ketiganya).
+- Payload turun: inventory tidak menarik showroomId/branchId per unit; reports tidak menarik arrivalPhotos/handoverPhoto/arrivalNotes/notes/odometer/color (win nyata karena arrivalPhotos bisa berisi banyak URL); marketings tidak menarik baris marketing penuh+showroomId; taxonomy hanya kind+name.
+- KEAMANAN: staffAccount.findMany tidak lagi menarik passwordHash dari DB sama sekali (hash password tidak pernah berpeluang bocor ke layer respons/log query).
+- Respons JSON DIJAMIN 100% identik — semua field yang dikirim klien tetap sama (kolom yang dihapus dari query memang tidak pernah dipetakan ke respons); Cache-Control private/no-cache/stale-while-revalidate=30 tetap di semua GET sukses.
+- Deviasi kecil dari spec: (1) import Vehicle di mappers.ts dipertahankan (dipakai Pick di PublicVehicleSource); (2) branches & marketings POST pakai select { id, isActive } karena handler mengecek showroom aktif; (3) findFirst (dup-check branches/staff/marketings) tidak disentuh — di luar goal findMany/findUnique dan marketings butuh dup.fullName untuk pesan 409.
+
+---
+Task ID: perf2-b
+Agent: general-purpose (client cache)
+Task: Migrasi dashboard owner OtoStok ke TanStack Query (stale-while-revalidate) + prefetch nav + dynamic imports.
+
+Work Log:
+- CREATE src/components/query-provider.tsx — QueryClient per browser-session via useState lazy-init; defaultOptions: staleTime 30_000, gcTime 10 menit, refetchOnWindowFocus false, retry 1.
+- CREATE src/lib/queries.ts — ApiError (bawa status HTTP), fetchJson<T> (no-store; 401 -> window.location.reload() lalu throw, perilaku sama dgn lama), qk (query key factory: session/inventory/taxonomy/settings/staff/branches/marketings/reports), hook useSessionQuery (staleTime 5 mnt, retry false, 401 -> { ok:false, session:null } dengan cast aman krn SessionResponse.session non-null di tipe), useInventoryQuery, useTaxonomyQuery (staleTime 5 mnt), useSettingsQuery, useStaffQuery, useBranchesQuery, useMarketingsQuery, useReportsQuery (placeholderData: keepPreviousData).
+- MODIFY src/app/layout.tsx — {children} dibungkus <QueryProvider> di dalam div flex min-h-screen (AppFooter tetap di level yang sama).
+- MODIFY src/components/admin-shell.tsx — hapus fetchSession + interface AdminSession lokal (fetchSession tidak dipakai file lain — sudah digrep); re-export type AdminSession dari @/lib/queries; AdminGate pakai useSessionQuery (isPending -> skeleton lama, session di-derive dr cache + cek slug); LoginCard submit -> queryClient.clear() + setQueryData(qk.session, j) sebelum onSuccess (AdminGate pass onSuccess no-op, render ulang dipicu cache); semua Link AdminNav diberi prefetch={true}; SessionBadge logout tak diubah (reload otomatis kosongkan cache memori).
+- MODIFY admin-client.tsx — buang fetch useEffect inventory+taxonomy & state data/loading/loadError/notFound/taxonomy; pakai useInventoryQuery + useTaxonomyQuery; notFound/loadError di-derive dr ApiError.status; refetch diganti refreshInventory = invalidateQueries(qk.inventory(slug)) dipakai di setVehicleStatusDirect, confirmDelete, Countdown onDone, VehicleForm onSaved, SellDialog onSold, tombol Coba Lagi; onTaxonomyChanged -> queryClient.setQueryData(qk.taxonomy(slug), t); DYNAMIC IMPORT ssr:false utk VehicleForm, SellDialog, WABroadcastDialog (props/render JSX tak berubah).
+- MODIFY mutasi-client.tsx — vehicles dr useInventoryQuery (cache SHARED dgn Dashboard; data instan saat pindah tab); 404 -> ShowroomNotFound; Coba Lagi -> inventoryQuery.refetch(); MutasiEditDialog onSaved -> invalidate qk.inventory(slug).
+- MODIFY reports-client.tsx — useReportsQuery(slug, from, to) dgn from/to = range + T00:00:00/T23:59:59; keepPreviousData bikin ganti preset mulus (data lama tampil saat loading, tanpa skeleton); Coba Lagi -> reportsQuery.refetch(); exportCsv & seluruh JSX tidak berubah.
+- MODIFY settings-client.tsx — useSettingsQuery; one-shot hydration form via useRef(hydrated) + useEffect agar refetch background tidak menimpa editan user; setelah PATCH sukses -> invalidate qk.settings(slug).
+- MODIFY branches-client.tsx — useBranchesQuery (partners-style derive, loading = isPending); toast error load dipertahankan via useEffect kecil; submit & confirmDelete sukses -> invalidate qk.branches(slug).
+- MODIFY marketings-client.tsx — useMarketingsQuery; toast error load dipertahankan via useEffect kecil; submit, toggleActive, confirmDelete sukses -> invalidate qk.marketings(slug); alur upload KTP tidak disentuh.
+- MODIFY staff-client.tsx — useStaffQuery; denied (403) & notFound (404) di-derive dr ApiError; toggleActive, confirmDelete, create-account sukses -> invalidate qk.staff(slug).
+- Verifikasi: bunx tsc --noEmit -> 0 error di src/ (sisa error hanya pre-existing di skills/, di luar proyek); bun run lint -> exit 0 bersih; dev server :3000 recompile sukses, GET /admin/[slug] 200.
+
+Stage Summary:
+- Provider TanStack Query memasang cache memori global: staleTime 30 dtk, gcTime 10 mnt, refetchOnWindowFocus false, retry 1 — pindah tab Dashboard/Mutasi/Laporan/Pengaturan/Cabang/Marketing/Staf menampilkan data INSTAN dari cache tanpa skeleton "Memuat..." berulang, refresh background tetap jalan (pola SWR).
+- Session check juga masuk cache (staleTime 5 mnt) — skeleton "cek sesi" tidak muncul lagi di tiap perpindahan tab; login meng-prime cache via setQueryData + clear() untuk buang cache sesi showroom lain.
+- Cache inventory SHARED antara Dashboard & Mutasi (key sama, invalidasi dari kedua halaman) — 401-reload lama pindah ke fetchJson.
+- Nav admin di-prefetch penuh (prefetch={true}); 3 komponen berat (VehicleForm, SellDialog, WABroadcastDialog) jadi dynamic import ssr:false — JS form/modal tidak memblokir render pertama.
+- Deviasi kecil: (1) ApiError tidak diimport ke admin-shell (tidak terpakai di sana — import sia-sia akan kena lint); (2) marketings pakai partners = data?.marketings ?? [] (bukan ?? null) krn JSX lama membaca partners.length langsung agar tak perlu guard baru; (3) SessionResponse diimpor admin-shell dari @/lib/types (queries.ts hanya meng-import, tidak re-export, tipe tsb); (4) branches & marketings mendapat useEffect kecil utk toast gagal-load (menjaga UX lama); (5) SessionResponse 401 fallback di-cast `as unknown as SessionResponse` krn field session non-null di tipe.
+
+---
+Task ID: perf2-c
+Agent: Z.ai Code (orchestrator)
+Task: Verifikasi E2E optimasi performa dashboard (TanStack Query cache, payload API, prefetch, dynamic imports) + fix bug gate login
+
+Work Log:
+- Bug ditemukan saat E2E browser: LoginCard memakai queryClient.clear() SEBELUM setQueryData(qk.session) — clear() menghapus query ['session'] yang sedang di-observe sehingga AdminGate macet di kartu login meski toast sukses tampil. Fix: setQueryData dulu, lalu removeQueries({ predicate: key[0] !== 'session' }) — urutan aman; login kini render dashboard tanpa reload (diverifikasi browser).
+- Pengukuran navigasi tab (MutationObserver timing, dev): Dashboard→Mutasi 281ms 0 skeleton; Mutasi→Dashboard 257ms; Laporan kunjungan-2 88ms / kunjungan-3 156ms (vs 1.232ms kunjungan pertama); Staf kunjungan-1 1.189ms (cold, wajar); 0 skeleton flash di semua kasus — bukti stale-while-revalidate jalan.
+- Interaktivitas inti: quick-action Ditahan→HOLD badge+toast+refetch via invalidateQueries; revert ke Tersedia OK; dialog Tambah Motor (dynamic chunk) terbuka 250ms dgn merk/foto utuh; logout→login tanpa reload OK.
+- Payload API: /staff TIDAK lagi memuat passwordHash (select eksplisit); /inventory 27 kolom persis AdminVehicleSource + basePrice owner + photos list + stats benar (9/0/2, 11 unit, 2 cabang); /reports item 11 kolom ringkas (arrivalPhotos/handoverPhoto/notes dsb tidak ditarik).
+- Cache-Control 'private, no-cache, stale-while-revalidate=30' terverifikasi via curl pada 7 endpoint: inventory, taxonomy, settings, staff, branches, marketings, reports.
+- Layout: mobile iPhone 14 tanpa scroll horizontal; footer menempel di bawah viewport pada halaman pendek (Staf 900px) dan terdorong natural di dashboard panjang; desktop 1366px bersih.
+- tsc --noEmit 0 error src/, eslint bersih, dev.log tanpa error (hanya warning LCP image pre-existing).
+
+Stage Summary:
+- Pindah tab dashboard kini instan dari cache memori (<300ms, tanpa skeleton berulang); kunjungan ulang 88–156ms; data tetap segar via invalidateQueries setelah mutasi + refetch background saat stale >30s.
+- Keamanan tambahan: passwordHash tidak pernah keluar dari DB di endpoint staff.
+- Semua 4 poin permintaan user terpenuhi + push main (deploy Vercel otomatis).

@@ -13,13 +13,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if (!session) {
     return NextResponse.json({ error: 'Belum login.' }, { status: 401 })
   }
-  const showroom = await db.showroom.findUnique({ where: { slug } })
+  // Select spesifik — showroom hanya dipakai untuk cek keberadaan + id.
+  const showroom = await db.showroom.findUnique({ where: { slug }, select: { id: true } })
   if (!showroom) {
     return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
   }
   const rows = await db.taxonomy.findMany({
     where: { showroomId: showroom.id },
     orderBy: { name: 'asc' },
+    // Hanya kind + name yang dikirim ke klien.
+    select: { kind: true, name: true },
   })
   return NextResponse.json(
     {
@@ -41,7 +44,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     if (!session) {
       return NextResponse.json({ error: 'Belum login.' }, { status: 401 })
     }
-    const showroom = await db.showroom.findUnique({ where: { slug } })
+    // Select spesifik — showroom hanya dipakai untuk cek keberadaan + id.
+    const showroom = await db.showroom.findUnique({ where: { slug }, select: { id: true } })
     if (!showroom) {
       return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
     }
@@ -61,6 +65,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
     const exists = await db.taxonomy.findUnique({
       where: { showroomId_kind_name: { showroomId: showroom.id, kind, name } },
+      // Hanya dipakai sebagai cek keberadaan.
+      select: { id: true },
     })
     if (exists) {
       return NextResponse.json({ error: `"${name}" sudah ada di daftar.` }, { status: 409 })
