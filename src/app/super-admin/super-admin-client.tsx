@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Store,
   Ticket,
+  Trash2,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -40,6 +41,16 @@ import {
 } from '@/components/ui/table'
 import { PLAN_LABELS, SUPER_PLANS } from '@/lib/constants'
 import { copyToClipboard, formatDateID, formatPhoneDisplay, waLink } from '@/lib/format'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 /** Sesi Super Admin disimpan di sessionStorage (hilang saat tab ditutup). */
 const SESSION_KEY = 'otostok_sa_key'
@@ -177,6 +188,7 @@ export function SuperAdminClient() {
 
   // Per-baris busy state utk aksi cepat
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<SuperLicenseRow | null>(null)
   const secretRef = useRef<string | null>(null)
 
   const refetch = useCallback(async () => {
@@ -372,8 +384,7 @@ export function SuperAdminClient() {
     }
   }
 
-  /** Aksi cepat per baris: extend / suspend / unsuspend. */
-  async function handleAction(row: SuperLicenseRow, action: 'extend' | 'suspend' | 'unsuspend') {
+  /** Aksi cepat per baris: extend / suspend / unsuspend. */  async function handleAction(row: SuperLicenseRow, action: 'extend' | 'suspend' | 'unsuspend') {
     setBusyId(`${row.id}-${action}`)
     try {
       const res = await fetch('/api/super-admin/licenses', {
@@ -393,6 +404,44 @@ export function SuperAdminClient() {
       await refetch()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Aksi gagal.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /**
+   * Hapus lisensi PERMANEN (hard delete). Bila lisensi terikat showroom,
+   * server menghapus cascade: showroom + unit + booking + staff + cabang
+   * + taxonomy + marketing — dalam satu transaksi leaf-first.
+   */
+  async function handleDelete(row: SuperLicenseRow) {
+    setBusyId(`${row.id}-delete`)
+    try {
+      // Cookie sesi otentikasi otomatis terkirim; field body "key" sebagai
+      // cadangan bila cookie hilang.
+      const res = await fetch(`/api/super-admin/licenses/${row.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: secretRef.current ?? '' }),
+      })
+      if (res.status === 401) {
+        setDeleteTarget(null)
+        await refetch()
+        return
+      }
+      // Parse aman — error apa pun tetap menghasilkan pesan yang jelas.
+      const j = (await res.json().catch(() => ({}))) as ApiErrorPayload & {
+        deletedLicenseKey?: string
+      }
+      if (!res.ok) {
+        throw new Error(formatApiError(j, `Gagal menghapus lisensi. (HTTP ${res.status})`))
+      }
+      toast.success(`Lisensi ${j.deletedLicenseKey ?? row.licenseKey} dihapus permanen.`)
+      setDeleteTarget(null)
+      await refetch()
+    } catch (e) {
+      // Dialog tetap terbuka agar user bisa batal / coba lagi.
+      toast.error(e instanceof Error ? e.message : 'Gagal menghapus lisensi.')
     } finally {
       setBusyId(null)
     }
@@ -688,6 +737,7 @@ export function SuperAdminClient() {
                         busyId={busyId}
                         onAction={handleAction}
                         onCopy={copy}
+                        onDelete={setDeleteTarget}
                         compact={false}
                       />
                     ))}
@@ -704,6 +754,7 @@ export function SuperAdminClient() {
                     busyId={busyId}
                     onAction={handleAction}
                     onCopy={copy}
+                    onDelete={setDeleteTarget}
                     compact
                   />
                 ))}
@@ -712,6 +763,45 @@ export function SuperAdminClient() {
           )}
         </section>
       </div>
+
+      {/* Dialog konfirmasi hapus permanen */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus lisensi permanen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus lisensi/akun ini secara permanen? Tindakan ini
+              tidak dapat dibatalkan.
+              {deleteTarget && (
+                <span className="mt-2.5 block rounded-md border border-red-200 bg-red-50 p-2.5 text-[11px] font-bold text-red-700">
+                  Lisensi <span className="font-mono">{deleteTarget.licenseKey}</span>
+                  {deleteTarget.showroom
+                    ? ` — showroom "${deleteTarget.showroom.name}" beserta ${deleteTarget.usedUnits} unit kendaraan, booking/hold, akun staff, cabang, kategori/merek, dan rekanan marketing akan IKUT DIHAPUS dari database.`
+                    : ' (belum terikat showroom) akan dihapus dari database.'}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busyId != null}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-700 font-extrabold text-white hover:bg-red-800"
+              disabled={busyId != null}
+              onClick={(e) => {
+                e.preventDefault() // dialog ditutup manual setelah sukses (handleDelete)
+                if (deleteTarget) void handleDelete(deleteTarget)
+              }}
+            >
+              {busyId === `${deleteTarget?.id}-delete` ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Trash2 className="mr-1.5 h-4 w-4" aria-hidden />
+              )}
+              Ya, Hapus Permanen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -722,12 +812,14 @@ function LicenseRowActions({
   busyId,
   onAction,
   onCopy,
+  onDelete,
   compact,
 }: {
   row: SuperLicenseRow
   busyId: string | null
   onAction: (row: SuperLicenseRow, action: 'extend' | 'suspend' | 'unsuspend') => void
   onCopy: (text: string, okMsg: string) => void
+  onDelete: (row: SuperLicenseRow) => void
   compact: boolean
 }) {
   const st = effectiveStatus(row)
@@ -834,7 +926,7 @@ function LicenseRowActions({
   )
 
   const actionCell = (
-    <div className={compact ? 'grid grid-cols-3 gap-1.5' : 'flex items-center justify-end gap-1.5'}>
+    <div className={compact ? 'grid grid-cols-2 gap-1.5' : 'flex items-center justify-end gap-1.5'}>
       <Button
         variant="outline"
         size="sm"
@@ -884,6 +976,16 @@ function LicenseRowActions({
           )}
         </Button>
       )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 border-red-300 bg-red-50 px-2 text-[11px] font-extrabold text-red-700 hover:bg-red-100"
+        disabled={busy}
+        title="Hapus lisensi permanen — bila terikat showroom, seluruh datanya ikut dihapus"
+        onClick={() => onDelete(row)}
+      >
+        <Trash2 className="mr-0.5 h-3 w-3" aria-hidden /> Hapus
+      </Button>
       <Button
         variant="ghost"
         size="sm"

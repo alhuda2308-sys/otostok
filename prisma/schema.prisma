@@ -41,7 +41,7 @@ model Showroom {
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  license    License       @relation(fields: [licenseId], references: [id])
+  license    License       @relation(fields: [licenseId], references: [id], onDelete: Cascade)
   vehicles   Vehicle[]
   staff      StaffAccount[]
   taxonomies Taxonomy[]

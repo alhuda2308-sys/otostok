@@ -14,14 +14,15 @@
 --     (sumber kebenaran model aplikasi).
 --   • Semua kolom ID & FK bertipe UUID — aplikasi (Prisma) mengisi
 --     UUIDv4 sendiri via @default(uuid()), cocok dgn konvensi Supabase.
+--   • Menghapus lisensi di panel Super Admin akan menghapus cascade
+--     showroom terkait + seluruh datanya (FK showrooms.license_id memakai
+--     ON DELETE CASCADE).
 --   • Setelah ini, set env Vercel: DATABASE_URL (connection string
 --     Postgres Supabase) + SUPER_ADMIN_SECRET, lalu redeploy.
 --
 -- Tabel: licenses, showrooms, staff_accounts, branches, taxonomies,
 --        vehicles, marketings, bookings
 -- ============================================================
-
-
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
@@ -189,7 +190,7 @@ CREATE INDEX "bookings_vehicle_id_status_idx" ON "bookings"("vehicle_id", "statu
 CREATE INDEX "bookings_marketing_id_idx" ON "bookings"("marketing_id");
 
 -- AddForeignKey
-ALTER TABLE "showrooms" ADD CONSTRAINT "showrooms_license_id_fkey" FOREIGN KEY ("license_id") REFERENCES "licenses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "showrooms" ADD CONSTRAINT "showrooms_license_id_fkey" FOREIGN KEY ("license_id") REFERENCES "licenses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "staff_accounts" ADD CONSTRAINT "staff_accounts_showroom_id_fkey" FOREIGN KEY ("showroom_id") REFERENCES "showrooms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
