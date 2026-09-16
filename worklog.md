@@ -490,3 +490,25 @@ Work Log:
 Stage Summary:
 - Satu-baris-esensi: Supabase Storage hosted butuh DUA header auth (`Authorization: Bearer` + `apikey`). Setelah deploy ini, upload pertama akan OTOMATIS membuat bucket otostok-media (PUBLIC) & otostok-ktp (PRIVATE) lalu menyimpan file — tidak ada setup manual di dashboard Supabase.
 - Tidak ada perubahan env/kontrak API; user tinggal tunggu deploy selesai lalu ulangi upload logo/header/foto unit.
+
+---
+Task ID: supabase-url-rest-v1-normalize
+Agent: Z.ai Code (main)
+Task: Upload masih gagal — toast "Gagal membuat bucket Supabase "otostok-media" (404): {"code":"PGRST125","details":null,"hint":null,"message":"Invalid path specified in request URL"}"
+
+Work Log:
+- Diagnosa: PGRST* = kode error PostgREST (database REST Supabase), BUKAN Storage. Artinya request storage mendarat di endpoint /rest/v1 — hampir pasti karena SUPABASE_URL di Vercel diisi dgn "REST URL" dari dashboard: https://<ref>.supabase.co/rest/v1 (bukan URL proyek root). Konsisten dgn error sebelumnya: sebelum fix apikey, request ditolak Kong ("No API key found"); setelah apikey lolos, request di-route ke PostgREST → PGRST125.
+- Fix ganda di src/lib/storage.ts:
+  1. normalizeSupabaseUrl(): buang trailing slash + akhiran path API yang tersalin salah (/rest/v1, /storage/v1, /auth/v1, /realtime/v1, /functions/v1, /pg/v1, /meta/v1) — env user yang salah KINI OTOMATIS DIKOREKSI tanpa perlu ubah Vercel
+  2. storageError(): penerjemah respons gagal Supabase → pesan aksi: pola "PGRST/Invalid path" → "SUPABASE_URL harus URL proyek root tanpa /rest/v1"; "No API key found" → cek service_role key; 403/jwt/invalid key → ambil service_role dari Dashboard → API
+  3. Keempat titik REST (bucket create/probe, upload, download, delete) kini pakai storageError
+- supabaseUrlWasCorrected() diekspor; /api/health kini menampilkan catatan bila SUPABASE_URL terkoreksi otomatis (menganjurkan perbaikan env ke URL root)
+- E2E mock Supabase v2 (port 3998, gateway palsu: tanpa apikey→401 kong, path /rest/v1/*→PGRST125):
+  • SKENARIO A (SUPABASE_URL=http://localhost:3998/rest/v1 — persis env user): saveMediaFile SUKSES, URL publik benar, supabaseUrlWasCorrected=true, 0 request kena /rest/v1, KTP save/read/delete OK — SEMUA LOLOS
+  • SKENARIO B (URL root normal): semua PASS, corrected=false — SEMUA LOLOS
+- lint bersih; artefak test dihapus.
+
+Stage Summary:
+- Root cause ketiga (rantai upload): SUPABASE_URL berisi akhiran /rest/v1 → request storage kena PostgREST → PGRST125. Sekarang DIKOREKSI OTOMATIS di kode, jadi deploy berikutnya upload langsung jalan walau env belum diubah.
+- Bila user tetap merapikan env: SUPABASE_URL = https://<project-ref>.supabase.co (root, tanpa path) — disarankan agar /api/health tidak menampilkan catatan koreksi.
+- Rantai perbaikan upload sejauh ini: (1) route hilang krn gitignore → diperbaiki 4ff4773; (2) header apikey kurang → febdb3a; (3) SUPABASE_URL salah path → commit ini. Setiap langkah terverifikasi dgn mock yang mereproduksi error produksi secara persis.

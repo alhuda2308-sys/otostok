@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { supabaseStorageActive } from '@/lib/storage'
+import { supabaseStorageActive, supabaseUrlWasCorrected } from '@/lib/storage'
 
 export const runtime = 'nodejs'
 
@@ -74,7 +74,7 @@ export async function GET() {
       env: {
         databaseUrl: { present: Boolean(url), protocol, host },
         storage: supabaseStorageActive()
-          ? 'supabase (upload foto AKTIF)'
+          ? `supabase (upload foto AKTIF)${supabaseUrlWasCorrected() ? ' — CATATAN: SUPABASE_URL berisi akhiran path API (/rest/v1 dll) dan sudah DIKOREKSI OTOMATIS; sebaiknya perbaiki env di Vercel menjadi URL proyek root https://<ref>.supabase.co' : ''}`
           : 'disk (upload foto TIDAK jalan di Vercel — set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)',
         superAdminSecret: Boolean(process.env.SUPER_ADMIN_SECRET),
       },

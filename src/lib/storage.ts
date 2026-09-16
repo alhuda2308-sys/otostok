@@ -22,12 +22,32 @@ import path from 'path'
  * unduh file privat lewat server route yang WAJIB lolos sesi aplikasi.
  */
 
-const SUPABASE_URL = (
-  process.env.SUPABASE_URL ??
-  process.env.NEXT_PUBLIC_SUPABASE_URL ??
-  ''
-).replace(/\/+$/, '')
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+/**
+ * Rapikan SUPABASE_URL: buang slash di akhir DAN akhiran path API yang sering
+ * tersalin salah dari dashboard Supabase ("REST URL" dsb). URL yang BENAR
+ * adalah URL proyek ROOT: https://<project-ref>.supabase.co
+ *
+ * Contoh salah yang dikoreksi otomatis:
+ *   https://<ref>.supabase.co/rest/v1  → https://<ref>.supabase.co
+ *   (kalau tidak dikoreksi, request storage mendarat di PostgREST dan gagal
+ *   PGRST125 "Invalid path specified in request URL")
+ */
+function normalizeSupabaseUrl(raw: string): string {
+  return raw
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/(?:rest|storage|auth|realtime|functions|pg|meta)\/v1$/i, '')
+}
+
+const RAW_SUPABASE_URL =
+  (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
+const SUPABASE_URL = normalizeSupabaseUrl(RAW_SUPABASE_URL)
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+
+/** Apakah SUPABASE_URL ternyata memuat akhiran path API (telah dikoreksi otomatis)? */
+export function supabaseUrlWasCorrected(): boolean {
+  return Boolean(RAW_SUPABASE_URL) && normalizeSupabaseUrl(RAW_SUPABASE_URL) !== RAW_SUPABASE_URL.replace(/\/+$/, '')
+}
 
 export const MEDIA_BUCKET = 'otostok-media' // PUBLIC — logo/header/foto unit
 export const KTP_BUCKET = 'otostok-ktp' // PRIVATE — foto KTP rekanan
@@ -66,6 +86,35 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
   }
 }
 
+/**
+ * Ubah respons gagal Supabase menjadi pesan Error yang MUDAH DIPAHAMI —
+ * mengenali pola kesalahan env yang paling sering terjadi di produksi.
+ */
+async function storageError(aksi: string, res: Response): Promise<Error> {
+  const body = (await res.text().catch(() => '')).slice(0, 300)
+
+  // PGRST* = error PostgREST (database REST) — berarti request storage
+  // mendarat di endpoint yang salah: SUPABASE_URL bukan URL proyek root.
+  if (body.includes('PGRST') || body.includes('Invalid path')) {
+    return new Error(
+      `${aksi} gagal (${res.status}): SUPABASE_URL sepertinya salah — request kena endpoint database REST, bukan Storage. ` +
+        `SUPABASE_URL harus URL proyek root: https://<project-ref>.supabase.co (TANPA akhiran /rest/v1). ` +
+        `Detail: ${body}`,
+    )
+  }
+  if (body.includes('No API key found')) {
+    return new Error(
+      `${aksi} gagal (${res.status}): header apikey tidak diterima — pastikan SUPABASE_SERVICE_ROLE_KEY diisi dengan service_role key (bukan anon key). Detail: ${body}`,
+    )
+  }
+  if (res.status === 403 || body.toLowerCase().includes('jwt') || body.toLowerCase().includes('invalid key')) {
+    return new Error(
+      `${aksi} gagal (${res.status}): SUPABASE_SERVICE_ROLE_KEY ditolak — pastikan mengambil dari Supabase Dashboard → Project Settings → API → service_role. Detail: ${body}`,
+    )
+  }
+  return new Error(`${aksi} gagal (${res.status}): ${body}`)
+}
+
 // Bucket yang sudah dipastikan ada — cache per proses server agar tidak
 // mengecek bucket pada setiap upload.
 const ensuredBuckets = new Set<string>()
@@ -92,9 +141,7 @@ async function ensureBucket(bucket: string, isPublic: boolean): Promise<void> {
   if (!create.ok) {
     const body = await create.text().catch(() => '')
     if (!body.toLowerCase().includes('exist')) {
-      throw new Error(
-        `Gagal membuat bucket Supabase "${bucket}" (${create.status}): ${body.slice(0, 300)}`,
-      )
+      throw await storageError(`Gagal membuat bucket Supabase "${bucket}"`, create)
     }
   }
   ensuredBuckets.add(bucket)
@@ -115,10 +162,7 @@ async function uploadObject(
     body: new Uint8Array(buf),
   })
   if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(
-      `Supabase Storage upload gagal (${res.status}): ${body.slice(0, 300)}`,
-    )
+    throw await storageError('Supabase Storage upload file', res)
   }
 }
 
@@ -128,7 +172,7 @@ async function downloadObject(bucket: string, objectPath: string): Promise<Buffe
     cache: 'no-store',
   })
   if (!res.ok) {
-    throw new Error(`Supabase Storage baca file gagal (${res.status}).`)
+    throw await storageError('Supabase Storage baca file', res)
   }
   return Buffer.from(await res.arrayBuffer())
 }
@@ -139,7 +183,7 @@ async function deleteObject(bucket: string, objectPath: string): Promise<void> {
     headers: authHeaders(),
   })
   if (!res.ok) {
-    throw new Error(`Supabase Storage hapus file gagal (${res.status}).`)
+    throw await storageError('Supabase Storage hapus file', res)
   }
 }
 
