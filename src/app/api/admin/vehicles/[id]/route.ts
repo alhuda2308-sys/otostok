@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { requireShowroomSession } from '@/lib/auth'
 import { cleanupExpiredHolds, HOLD_HOURS } from '@/lib/holds'
 import { toAdminVehicle } from '@/lib/mappers'
+import { dbErrorResponse } from '@/lib/db-errors'
 
 const MAX_PHOTOS = 60 // foto unit tanpa batas praktis
 
@@ -195,8 +196,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     return NextResponse.json({ ok: true, vehicle: toAdminVehicle(updated, hold, isOwner) })
   } catch (e) {
-    console.error('[admin update vehicle] error:', e)
-    return NextResponse.json({ error: 'Terjadi kesalahan server.' }, { status: 500 })
+    // Mode diagnosa: error asli (mis. P2022 kolom belum sinkron di Supabase)
+    // tampil di layar + log server, bukan pesan generik.
+    return dbErrorResponse(e, 'admin-update-vehicle')
   }
 }
 
@@ -219,7 +221,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     await db.vehicle.delete({ where: { id } })
     return NextResponse.json({ ok: true })
   } catch (e) {
-    console.error('[admin delete vehicle] error:', e)
-    return NextResponse.json({ error: 'Terjadi kesalahan server.' }, { status: 500 })
+    return dbErrorResponse(e, 'admin-delete-vehicle')
   }
 }

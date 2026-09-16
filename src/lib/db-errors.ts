@@ -43,11 +43,18 @@ function mapPrismaCode(err: PrismaLikeError): { status: number; message: string 
         message:
           'Tabel database belum dibuat. Jalankan migrasi: SQL di supabase/schema.sql (Supabase SQL Editor) atau `bun run db:push`.',
       }
-    case 'P2022':
+    case 'P2022': {
+      // Kolom hilang di tabel lama (biasanya DB Supabase dibuat dari DDL versi
+      // awal, lalu aplikasi bertambah kolom). Beri instruksi yang PERSIS.
+      const col = err.meta?.column ?? (target || null)
       return {
         status: 500,
-        message: `Kolom database tidak cocok dengan skema aplikasi${target ? ` (${target})` : ''}. Jalankan ulang migrasi skema.`,
+        message:
+          `Skema database belum sinkron: kolom ${col ? `"${col}" ` : ''}tidak ada di database. ` +
+          'Perbaiki (1 menit): buka Supabase Dashboard → SQL Editor → paste SELURUH isi file ' +
+          'supabase/migration-sync-existing-db.sql → Run (idempotent, aman untuk data yang sudah ada), lalu coba lagi.',
       }
+    }
     case 'P2003':
       return {
         status: 409,

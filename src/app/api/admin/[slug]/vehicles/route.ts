@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireShowroomSession } from '@/lib/auth'
 import { toAdminVehicle } from '@/lib/mappers'
+import { dbErrorResponse } from '@/lib/db-errors'
 
 const MAX_PHOTOS = 60 // foto unit tanpa batas praktis (penjaga kesehatan DB)
 
@@ -130,7 +131,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
     return NextResponse.json({ ok: true, vehicle: toAdminVehicle(vehicle, null, isOwner) })
   } catch (e) {
-    console.error('[admin create vehicle] error:', e)
-    return NextResponse.json({ error: 'Terjadi kesalahan server.' }, { status: 500 })
+    // Mode diagnosa: error asli (mis. P2022 kolom tabel vehicles belum sinkron
+    // di Supabase) tampil di layar + log server, bukan pesan generik.
+    return dbErrorResponse(e, 'admin-create-vehicle')
   }
 }

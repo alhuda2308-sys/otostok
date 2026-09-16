@@ -277,11 +277,17 @@ export function VehicleForm({
                       if (name.length < 2) return
                       try {
                         await addTaxonomy('brand', name)
-                        set('brand', name)
-                        setNewBrandMode(false)
                       } catch (err) {
-                        toast.error(err instanceof Error ? err.message : 'Gagal menambah merk.')
+                        // Merk sudah terdaftar (409, mis.Honda/Yamaha bawaan) →
+                        // tetap PILIH merk itu — intent user sudah jelas.
+                        const msg = err instanceof Error ? err.message : ''
+                        if (!msg.includes('sudah ada')) {
+                          toast.error(msg || 'Gagal menambah merk.')
+                          return
+                        }
                       }
+                      set('brand', name)
+                      setNewBrandMode(false)
                     }}
                   >
                     Simpan
@@ -349,11 +355,16 @@ export function VehicleForm({
                       if (name.length < 2) return
                       try {
                         await addTaxonomy('category', name)
-                        set('category', name)
-                        setNewCategoryMode(false)
                       } catch (err) {
-                        toast.error(err instanceof Error ? err.message : 'Gagal menambah kategori.')
+                        // Kategori sudah terdaftar (409) → tetap pilih kategori itu.
+                        const msg = err instanceof Error ? err.message : ''
+                        if (!msg.includes('sudah ada')) {
+                          toast.error(msg || 'Gagal menambah kategori.')
+                          return
+                        }
                       }
+                      set('category', name)
+                      setNewCategoryMode(false)
                     }}
                   >
                     Simpan

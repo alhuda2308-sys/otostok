@@ -42,6 +42,23 @@ async function probeDb(): Promise<DbProbe> {
   } catch (e) {
     return { ok: false, step: 'skema (tabel/kolom showroom)', ...errInfo(e) }
   }
+  // 3) Skema tabel vehicles: kolom terbaru ada semua? (drift di sini = gagal
+  //    "tambah motor" dgn P2022 — INSERT menyertakan SEMUA kolom skema)
+  try {
+    await db.vehicle.findFirst({
+      select: {
+        id: true,
+        commissionAmount: true,
+        branchId: true,
+        purchasedAt: true,
+        arrivalPhotos: true,
+        soldAt: true,
+        handoverPhoto: true,
+      },
+    })
+  } catch (e) {
+    return { ok: false, step: 'skema (tabel vehicles — kolom komisi/mutasi/cabang)', ...errInfo(e) }
+  }
   return { ok: true }
 }
 

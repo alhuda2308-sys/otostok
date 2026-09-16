@@ -512,3 +512,25 @@ Stage Summary:
 - Root cause ketiga (rantai upload): SUPABASE_URL berisi akhiran /rest/v1 → request storage kena PostgREST → PGRST125. Sekarang DIKOREKSI OTOMATIS di kode, jadi deploy berikutnya upload langsung jalan walau env belum diubah.
 - Bila user tetap merapikan env: SUPABASE_URL = https://<project-ref>.supabase.co (root, tanpa path) — disarankan agar /api/health tidak menampilkan catatan koreksi.
 - Rantai perbaikan upload sejauh ini: (1) route hilang krn gitignore → diperbaiki 4ff4773; (2) header apikey kurang → febdb3a; (3) SUPABASE_URL salah path → commit ini. Setiap langkah terverifikasi dgn mock yang mereproduksi error produksi secara persis.
+
+---
+Task ID: vehicle-create-error-transparency
+Agent: Z.ai Code (main)
+Task: User melapor "terjadi kesalahan server saat tambah motor baru di katalog" — toast generik "Terjadi kesalahan server." saat simpan motor baru (foto upload SUDAH berhasil, 4 foto tampil di form). Pesan generik menyembunyikan penyebab asli.
+
+Work Log:
+- Diagnosa: toast "Terjadi kesalahan server." = catch-block generik di POST /api/admin/[slug]/vehicles (line 134). Kandidat akar masalah #1 di produksi: INSERT INTO vehicles menyertakan SEMUA kolom skema — bila tabel vehicles di Supabase dibuat dari DDL lama (belum ada commission_amount/branch_id/kolom mutasi), INSERT gagal P2022 sementara query showroom/license (yang dipakai login/dashboard) tetap sukses.
+- Fix 1 — transparansi error: POST /api/admin/[slug]/vehicles + PATCH & DELETE /api/admin/vehicles/[id] kini pakai dbErrorResponse(e, context) (mode diagnosa, selaras route licenses/activate/settings). Error Prisma asli + code + context tampil di toast & log server.
+- Fix 2 — db-errors.ts: pesan P2022 diperjelas dgn nama kolom (err.meta.column) + instruksi PERSIS: "buka Supabase Dashboard → SQL Editor → paste SELURUH isi file supabase/migration-sync-existing-db.sql → Run (idempotent, aman utk data yang sudah ada)".
+- Fix 3 — /api/health: probe ketiga mengecek tabel vehicles (select commissionAmount, branchId, purchasedAt, arrivalPhotos, soldAt, handoverPhoto) — drift kolom vehicles kini terdeteksi langsung oleh /api/health (step "skema (tabel vehicles ...)").
+- Fix 4 (bug UX ditemukan saat E2E browser): vehicle-form.tsx — "Tambah merk baru" dgn nama yang SUDAH terdaftar (mis. Honda/Yamaha bawaan seed aktivasi) → POST taxonomy 409 → set('brand') TIDAK jalan → user terjebak "Merk motor wajib diisi" walau textbox tampak terisi. Fix: 409 "sudah ada" → tetap pilih merk/kategori tsb + keluar mode input baru. Pola sama diterapkan pada kategori.
+- E2E API (curl): create license → activate → login owner → upload 2 foto (/api/upload 200) → POST /vehicles dgn photos+harga+notes multiline → ok:true, vehicle balik lengkap (basePrice owner-only, photos array, purchasedAt) → /api/health ok → cascade delete license OK.
+- E2E browser (agent-browser, golden path penuh): login UI → Tambah Motor → pilih Merk Honda (dropdown seed) → isi semua field → upload 2 foto via input file (kompresi klien jalan, toast "2 foto ditambahkan & dikompresi", 2 thumbnail tampil) → Simpan → toast "Motor baru masuk stok — status Ready." + modal tertutup + stok 0→1 + kartu Honda Beat 110 CBS tampil dgn foto/harga/READY. Cleanup penuh (license dihapus cascade, units:1 tercatat).
+- Catatan proses: agent-browser `upload` pd input[hidden] kadang silent-fail — dispatch Event('change') manual via eval dgn DataTransfer terbukti andal utk memicu onFilesPicked React.
+- lint bersih; artefak test (tool-results/e2e-vehicle) dihapus.
+
+Stage Summary:
+- Setiap kegagalan "tambah motor" di produksi kini menampilkan ERROR ASLI + kode + instruksi perbaikan di layar (bukan "Terjadi kesalahan server."). Bila penyebabnya drift skema (P2022), toast langsung memandu jalankan supabase/migration-sync-existing-db.sql di SQL Editor.
+- /api/health kini juga men-deteksi drift khusus tabel vehicles.
+- Bug "Tambah merk baru" utk nama sudah-terdaftar diperbaiki (409 → otomatis memilih merk tsb).
+- Alur tambah-motor end-to-end (form + foto + submit) terverifikasi jalan normal di lokal.
