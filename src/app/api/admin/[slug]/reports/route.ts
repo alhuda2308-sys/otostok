@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { PRIVATE_STALE_WHILE_REVALIDATE } from '@/lib/http-cache'
 import { requireShowroomSession } from '@/lib/auth'
 import { parsePhotos } from '@/lib/holds'
 import type { ReportItem, ReportsResponse } from '@/lib/types'
@@ -83,7 +84,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
         margin: isOwner ? omzet - capital - commission : null,
       },
     }
-    return NextResponse.json(data)
+    return NextResponse.json(data, {
+      headers: { 'Cache-Control': PRIVATE_STALE_WHILE_REVALIDATE },
+    })
   } catch (e) {
     console.error('[reports] error:', e)
     return NextResponse.json({ error: 'Terjadi kesalahan server.' }, { status: 500 })

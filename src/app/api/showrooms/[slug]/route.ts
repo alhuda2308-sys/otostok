@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { PRIVATE_STALE_WHILE_REVALIDATE } from '@/lib/http-cache'
 import { cleanupExpiredHolds } from '@/lib/holds'
 
 /**
@@ -29,15 +30,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
     brandSet.add(v.brand)
   }
 
-  return NextResponse.json({
-    name: showroom.name,
-    slug: showroom.slug,
-    address: showroom.address,
-    ownerPhone: showroom.ownerPhone,
-    logoUrl: showroom.logoUrl,
-    headerUrl: showroom.headerUrl,
-    mapsUrl: showroom.mapsUrl,
-    counts,
-    brands: [...brandSet].sort(),
-  })
+  return NextResponse.json(
+    {
+      name: showroom.name,
+      slug: showroom.slug,
+      address: showroom.address,
+      ownerPhone: showroom.ownerPhone,
+      logoUrl: showroom.logoUrl,
+      headerUrl: showroom.headerUrl,
+      mapsUrl: showroom.mapsUrl,
+      counts,
+      brands: [...brandSet].sort(),
+    },
+    { headers: { 'Cache-Control': PRIVATE_STALE_WHILE_REVALIDATE } },
+  )
 }

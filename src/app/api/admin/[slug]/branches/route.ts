@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { PRIVATE_STALE_WHILE_REVALIDATE } from '@/lib/http-cache'
 import { requireOwnerSession, requireShowroomSession } from '@/lib/auth'
 import type { BranchInfo } from '@/lib/types'
 
@@ -27,7 +28,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     where: { showroomId: showroom.id },
     orderBy: { createdAt: 'asc' },
   })
-  return NextResponse.json({ branches: branches.map(toInfo) })
+  return NextResponse.json({ branches: branches.map(toInfo) }, {
+    headers: { 'Cache-Control': PRIVATE_STALE_WHILE_REVALIDATE },
+  })
 }
 
 /**

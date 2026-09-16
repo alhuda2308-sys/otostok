@@ -46,15 +46,25 @@ import type {
 
 export type StatusFilter = 'all' | 'available' | 'hold'
 
-export function CatalogClient({ slug }: { slug: string }) {
-  const [data, setData] = useState<PublicCatalogResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+export function CatalogClient({
+  slug,
+  initialData,
+}: {
+  slug: string
+  /** Payload dari server (ISR /s/[slug]) — katalog non-whitelist tampil instan tanpa fetch awal. */
+  initialData?: PublicCatalogResponse | null
+}) {
+  const [data, setData] = useState<PublicCatalogResponse | null>(initialData ?? null)
+  const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
 
   // Sistem Rekanan Terdaftar: sesi verifikasi WhatsApp marketing
   const [marketing, setMarketing] = useState<MarketingSession | null>(null)
-  const [phase, setPhase] = useState<'checking' | 'gate' | 'open'>('checking')
+  const [phase, setPhase] = useState<'checking' | 'gate' | 'open'>(
+    // initialData non-null = showroom tanpa whitelist → konten sudah ter-render SSR
+    initialData ? 'open' : 'checking',
+  )
   const marketingRef = useRef<MarketingSession | null>(null)
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -112,8 +122,10 @@ export function CatalogClient({ slug }: { slug: string }) {
     const cached = loadMarketingSession(slug)
     marketingRef.current = cached
     setMarketing(cached)
-    refetch(false, cached)
-  }, [refetch, slug])
+    // Dengan initialData (ISR) konten sudah tampil → refresh SILENT agar kartu
+    // tidak berkedip; status hold terbaru tetap diperbarui di background.
+    refetch(Boolean(initialData), cached)
+  }, [refetch, slug, initialData])
 
   // Filter kategori & merek dari konfigurasi showroom (bisa ditambah owner)
   useEffect(() => {
@@ -619,6 +631,7 @@ function CatalogCard({
         <VehiclePhoto
           src={v.photos[0]}
           alt={`Foto ${v.brand} ${v.model} ${v.year}`}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className={`absolute inset-0 h-full w-full object-cover ${isSold ? 'opacity-75' : ''}`}
         />
         <span className="absolute left-2 top-2">

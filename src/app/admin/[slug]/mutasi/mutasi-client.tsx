@@ -154,6 +154,7 @@ function MutasiPage({
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-100">
                     <VehiclePhoto
+                      sizes="80px"
                       src={v.arrivalPhotos[0] ?? v.photos[0]}
                       alt={`Foto ${v.brand} ${v.model}`}
                       className="h-full w-full object-cover"
@@ -208,6 +209,7 @@ function MutasiPage({
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-100">
                     <VehiclePhoto
+                      sizes="80px"
                       src={v.photos[0]}
                       alt={`Foto ${v.brand} ${v.model}`}
                       className="h-full w-full object-cover"

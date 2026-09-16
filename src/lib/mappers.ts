@@ -3,10 +3,43 @@ import type { AdminVehicle, PublicVehicle } from './types'
 import { parsePhotos } from './holds'
 
 type HoldInfo = { marketingName: string; expiresAt: Date } | null
-/** Vehicle yang relasi branch-nya sudah di-include (opsional agar call site lama tetap kompatibel). */
-type VehicleWithBranch = Vehicle & { branch?: Branch | null }
+/**
+ * Vehicle + relasi branch yang DIPERSEMPIT ke 4 kolom yang tampil di UI.
+ * Kompatibel untuk baris penuh (include: { branch: true }) maupun
+ * include dengan select bersarang (id/name/address/mapsUrl saja).
+ */
+type VehicleWithBranch = Vehicle & {
+  branch?: Pick<Branch, 'id' | 'name' | 'address' | 'mapsUrl'> | null
+}
 
-function toBranchInfo(b: Branch | null | undefined): PublicVehicle['branch'] {
+/**
+ * Bentuk minimal yang dibutuhkan kartu katalog publik.
+ * API publik memakai `select` persis seperti ini supaya kolom berat yang
+ * tidak perlu (basePrice, arrivalPhotos, sold*, handoverPhoto, showroomId)
+ * tidak pernah ditarik dari database.
+ */
+export type PublicVehicleSource = Pick<
+  Vehicle,
+  | 'id'
+  | 'brand'
+  | 'model'
+  | 'category'
+  | 'year'
+  | 'licensePlate'
+  | 'color'
+  | 'odometer'
+  | 'taxStatus'
+  | 'documentStatus'
+  | 'sellingPrice'
+  | 'commissionAmount'
+  | 'status'
+  | 'photos'
+  | 'notes'
+  | 'createdAt'
+  | 'updatedAt'
+> & { branch?: Pick<Branch, 'id' | 'name' | 'address' | 'mapsUrl'> | null }
+
+function toBranchInfo(b: Pick<Branch, 'id' | 'name' | 'address' | 'mapsUrl'> | null | undefined): PublicVehicle['branch'] {
   return b ? { id: b.id, name: b.name, address: b.address, mapsUrl: b.mapsUrl } : null
 }
 
@@ -15,7 +48,7 @@ function toBranchInfo(b: Branch | null | undefined): PublicVehicle['branch'] {
  * PENTING: basePrice (harga modal) SENGAJA tidak dipetakan —
  * katalog publik tidak boleh pernah membocorkannya.
  */
-export function toPublicVehicle(v: VehicleWithBranch, activeHold: HoldInfo): PublicVehicle {
+export function toPublicVehicle(v: PublicVehicleSource, activeHold: HoldInfo): PublicVehicle {
   return {
     id: v.id,
     brand: v.brand,

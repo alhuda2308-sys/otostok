@@ -100,14 +100,15 @@ export function PhotoManager({
           return (
             <div
               key={p}
-              className={`relative overflow-hidden rounded-md border ${
+              className={`relative aspect-[4/3] w-full overflow-hidden rounded-md border ${
                 isCover ? 'border-blue-600 ring-1 ring-blue-600' : 'border-slate-200'
               }`}
             >
               <VehiclePhoto
                 src={p}
                 alt={`Foto ${i + 1}`}
-                className="aspect-[4/3] w-full object-cover"
+                sizes="(max-width: 640px) 33vw, 25vw"
+                className="h-full w-full object-cover"
               />
               {isCover && (
                 <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-blue-700 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-white">

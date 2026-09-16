@@ -63,3 +63,4 @@ download/
 *.pid
 /upload/
 public/uploads/
+tool-results/

@@ -689,6 +689,7 @@ function AdminVehicleCard({
       <div className="flex gap-3">
         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-100 sm:h-24 sm:w-24">
           <VehiclePhoto
+            sizes="96px"
             src={v.photos[0]}
             alt={`Foto ${v.brand} ${v.model}`}
             className="h-full w-full object-cover"

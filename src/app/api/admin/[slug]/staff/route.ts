@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { PRIVATE_STALE_WHILE_REVALIDATE } from '@/lib/http-cache'
 import { hashPassword, requireOwnerSession } from '@/lib/auth'
 import type { StaffAccountInfo } from '@/lib/types'
 
@@ -26,7 +27,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     isActive: r.isActive,
     createdAt: r.createdAt.toISOString(),
   }))
-  return NextResponse.json({ items })
+  return NextResponse.json({ items }, {
+    headers: { 'Cache-Control': PRIVATE_STALE_WHILE_REVALIDATE },
+  })
 }
 
 /**

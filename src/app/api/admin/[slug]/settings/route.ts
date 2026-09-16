@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { PRIVATE_STALE_WHILE_REVALIDATE } from '@/lib/http-cache'
 import { requireOwnerSession } from '@/lib/auth'
 import { dbErrorResponse } from '@/lib/db-errors'
 
@@ -20,15 +21,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     if (!showroom) {
       return NextResponse.json({ error: 'Showroom tidak ditemukan.' }, { status: 404 })
     }
-    return NextResponse.json({
-      name: showroom.name,
-      slug: showroom.slug,
-      address: showroom.address,
-      ownerPhone: showroom.ownerPhone,
-      logoUrl: showroom.logoUrl,
-      headerUrl: showroom.headerUrl,
-      mapsUrl: showroom.mapsUrl,
-    })
+    return NextResponse.json(
+      {
+        name: showroom.name,
+        slug: showroom.slug,
+        address: showroom.address,
+        ownerPhone: showroom.ownerPhone,
+        logoUrl: showroom.logoUrl,
+        headerUrl: showroom.headerUrl,
+        mapsUrl: showroom.mapsUrl,
+      },
+      { headers: { 'Cache-Control': PRIVATE_STALE_WHILE_REVALIDATE } },
+    )
   } catch (e) {
     return dbErrorResponse(e, 'settings GET')
   }

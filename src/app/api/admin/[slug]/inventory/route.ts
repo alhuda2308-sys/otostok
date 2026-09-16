@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import type { Booking } from '@prisma/client'
 import { db } from '@/lib/db'
+import { PRIVATE_STALE_WHILE_REVALIDATE } from '@/lib/http-cache'
 import { requireShowroomSession } from '@/lib/auth'
 import { cleanupExpiredHolds } from '@/lib/holds'
 import { toAdminVehicle } from '@/lib/mappers'
@@ -30,18 +30,30 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   const vehicles = await db.vehicle.findMany({
     where: { showroomId: showroom.id },
     orderBy: { createdAt: 'desc' },
-    include: { branch: true },
+    // Baris vehicle utuh (dipakai toAdminVehicle); relasi branch cukup 4 kolom
+    // yang tampil di UI — hemat payload pada stok besar.
+    include: { branch: { select: { id: true, name: true, address: true, mapsUrl: true } } },
   })
 
   // Cabang showroom — dipakai filter dashboard & dropdown lokasi di form unit
   const branches = await db.branch.findMany({
     where: { showroomId: showroom.id },
     orderBy: { createdAt: 'asc' },
+    select: { id: true, name: true, address: true, mapsUrl: true },
   })
 
   const bookings = await db.booking.findMany({
     where: { vehicle: { showroomId: showroom.id } },
     orderBy: { expiresAt: 'desc' },
+    select: {
+      id: true,
+      vehicleId: true,
+      marketingId: true,
+      marketingName: true,
+      marketingPhone: true,
+      status: true,
+      expiresAt: true,
+    },
   })
 
   const vehicleById = new Map(vehicles.map((v) => [v.id, v]))
@@ -80,9 +92,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   }
   if (isOwner) stats.capitalTurnover = capital
 
-  const holdByVehicle = new Map<string, Booking>()
+  const holdByVehicle = new Map<string, { marketingName: string; expiresAt: Date }>()
   for (const h of bookings) {
-    if (h.status === 'hold' && h.expiresAt.getTime() > now) holdByVehicle.set(h.vehicleId, h)
+    if (h.status === 'hold' && h.expiresAt.getTime() > now)
+      holdByVehicle.set(h.vehicleId, { marketingName: h.marketingName, expiresAt: h.expiresAt })
   }
 
   // Lisensi kedaluwarsa lazily
@@ -127,5 +140,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     })),
   }
 
-  return NextResponse.json(data)
+  return NextResponse.json(data, {
+    headers: { 'Cache-Control': PRIVATE_STALE_WHILE_REVALIDATE },
+  })
 }

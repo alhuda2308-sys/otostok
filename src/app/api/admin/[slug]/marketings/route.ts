@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { PRIVATE_STALE_WHILE_REVALIDATE } from '@/lib/http-cache'
 import { requireOwnerSession, requireShowroomSession } from '@/lib/auth'
 
 /** Bentuk rekanan yang dikirim ke dashboard — URL KTP adalah endpoint aman ber-sesi. */
@@ -67,7 +68,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     },
   })
 
-  return NextResponse.json({
+  return NextResponse.json(
+    {
     marketings: marketings.map((m) => {
       const holdCount = m.bookings.length
       const soldCount = m.bookings.filter((b) => b.vehicle.status === 'sold').length
@@ -84,7 +86,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
         soldCount,
       })
     }),
-  })
+    },
+    { headers: { 'Cache-Control': PRIVATE_STALE_WHILE_REVALIDATE } },
+  )
 }
 
 /**
