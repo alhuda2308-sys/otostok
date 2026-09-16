@@ -349,3 +349,25 @@ Stage Summary:
 - Layar /super-admin Vercel tidak akan lagi menampilkan "Terjadi kesalahan server" — pengguna akan melihat pesan Prisma asli + kode (mis. "[P2021] Tabel database belum dibuat..." atau pesan provider/kredensial apa pun), memungkinkan diagnosa produksi langsung dari UI
 - Prediksi error yang akan terlihat di Vercel setelah deploy ini: (a) P2021 → jalankan supabase/schema.sql di SQL Editor; (b) P1001/P1000 → DATABASE_URL salah; (c) pesan "the URL must start with protocol 'file:'" → Prisma Client SQLite dipakai di serverless, pastikan DATABASE_URL postgres:// agar build memilih schema.postgres.prisma (scripts/prisma-generate.sh)
 - Catatan keamanan: detail error teknis ekspos ke klien hanya di endpoint Super Admin (terlindungi Master Secret Key / cookie sesi) — disengaja utk mode diagnosa produksi
+
+---
+Task ID: supabase-uuid-p2023
+Agent: Z.ai Code (main)
+Task: Perbaiki error P2023 "Inconsistent column data: Error creating UUID ... found 'm' at 2" saat Generate Lisensi di Vercel+Supabase — kolom id UUID menerima string cuid dari Prisma; pastikan id baru UUID v4 valid, schema Postgres & DDL Supabase konsisten, push ke main.
+
+Work Log:
+- Diagnosa: DB Supabase milik user dibuat dgn kolom id UUID (bukan dari supabase/schema.sql versi lama yg TEXT — terbukti dr P2023). Prisma Client ter-deploy masih @default(cuid()) → setiap create mengirim string cuid ("cm...") → ditolak kolom UUID
+- Audit 9 titik db.*.create() di src/ + scripts/seed.ts: TIDAK ADA yg mengirim id eksplisit — semua bergantung default schema → perbaikan cukup di SATU titik: prisma/schema.postgres.prisma
+- prisma/schema.postgres.prisma:
+  - 8 model: @id @default(cuid()) → @id @default(uuid()) @db.Uuid (Prisma generate UUIDv4 sisi client utk semua create — tidak perlu ubah DB yang sudah ada, tidak perlu crypto.randomUUID() manual di handler)
+  - Semua kolom FK dianotasi @db.Uuid: licenseId, showroomId (staff/branch/taxonomy/vehicle/marketing), branchId, vehicleId, marketingId — penting: FK TEXT→UUID akan GAGAL dibuat Postgres; UUID→UUID valid
+  - Header comment: peringatan jangan pakai cuid() di schema postgres + alasan P2023
+- supabase/schema.sql di-regenerate via `prisma migrate diff --from-empty --to-schema-datamodel` → semua kolom id & FK kini UUID NOT NULL (17 kolom UUID), header diberi catatan UUID; dgn ini setup fresh konsisten dgn DB Supabase yang sudah berjalan
+- Verifikasi: prisma validate (dummy postgres URL) valid 🚀; db:generate:pg sukses; restore db:generate sqlite utk dev lokal; lint bersih; curl E2E lokal login 200 + POST generate 201 (SQLite lokal tetap cuid — by design, kolom TEXT tak terpengaruh)
+- Git: commit b98ccd8 "fix(prisma): ID Postgres pakai UUID v4..." → push origin main (e2416e0..b98ccd8) — Vercel auto-deploy terpicu
+
+Stage Summary:
+- Setelah deploy ini, POST/PATCH/activate/vehicles/staff/branches/marketings/taxonomy/bookings — SEMUA create akan mengirim UUIDv4 valid ke kolom UUID Supabase; P2023 hilang TANPA perlu migrasi ulang DB
+- User TIDAK perlu menjalankan ulang supabase/schema.sql (DB yang sudah ada tetap dipakai; DDL baru hanya utk setup fresh)
+- Prinsip penting tercatat: di schema Postgres, PK & kolom FK UUID wajib @db.Uuid + @default(uuid()); cuid() hanya utk schema SQLite lokal
+- Bila masih ada error setelah deploy, error asli kini tampil di layar (fitur diagnosa commit e2416e0) — mis. ketidakcocokan tipe kolom lain (timestamptz vs timestamp) akan langsung terbaca
