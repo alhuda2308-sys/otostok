@@ -6,16 +6,16 @@ import { QueryProvider } from '@/components/query-provider'
 
 export const metadata: Metadata = {
   title: {
-    default: 'OtoStok — Stok & Katalog Motor Bekas',
-    template: '%s — OtoStok',
+    default: 'MotoStock — Stok & Katalog Motor Bekas',
+    template: '%s — MotoStock',
   },
   description:
     'Software manajemen stok showroom motor bekas dan katalog marketing freelance. Aktivasi lisensi mandiri, katalog publik mobile-first, fitur tahan unit 2 jam.',
-  applicationName: 'OtoStok',
+  applicationName: 'MotoStock',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'OtoStok',
+    title: 'MotoStock',
   },
   formatDetection: {
     telephone: false,

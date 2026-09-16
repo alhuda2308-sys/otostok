@@ -50,7 +50,7 @@ export function ActivateClient() {
   // Live-check lisensi saat key selesai diketik
   useEffect(() => {
     const key = form.licenseKey.trim().toUpperCase()
-    if (!/^(MTR-[A-Z0-9]{4}-[A-Z0-9]{4}|OTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})$/.test(key)) {
+    if (!/^(MTR-[A-Z0-9]{4}-[A-Z0-9]{4}|OTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}|MOTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})$/.test(key)) {
       setLicenseInfo(null)
       return
     }
@@ -188,7 +188,7 @@ export function ActivateClient() {
 
   const lic = licenseInfo
   const licKeyValid =
-    /^(MTR-[A-Z0-9]{4}-[A-Z0-9]{4}|OTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})$/.test(
+    /^(MTR-[A-Z0-9]{4}-[A-Z0-9]{4}|OTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}|MOTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})$/.test(
       form.licenseKey.trim().toUpperCase(),
     )
 
@@ -207,7 +207,7 @@ export function ActivateClient() {
         </Button>
         <div className="flex items-center gap-2">
           <AppIcon className="h-7 w-7" />
-          <span className="text-xs font-extrabold text-blue-700">OtoStok</span>
+          <span className="text-xs font-extrabold text-blue-700">MotoStock</span>
         </div>
       </div>
 
@@ -231,7 +231,7 @@ export function ActivateClient() {
               id="lic"
               value={form.licenseKey}
               onChange={(e) => set('licenseKey', e.target.value.toUpperCase())}
-              placeholder="MTR-XXXX-XXXX / OTO-XXXX-XXXX-XXXX"
+              placeholder="MOTO-XXXX-XXXX-XXXX / MTR-XXXX-XXXX"
               autoComplete="off"
               className="h-11 font-mono text-sm font-bold tracking-wider"
               required

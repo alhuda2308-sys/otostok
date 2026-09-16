@@ -191,7 +191,7 @@ function BranchesPage({
       <div className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 py-4">
         {/* Info perilaku otomatis */}
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-900">
-          <p className="font-extrabold">Cara kerja cabang di OtoStok:</p>
+          <p className="font-extrabold">Cara kerja cabang di MotoStock:</p>
           <ul className="mt-1.5 list-disc space-y-1 pl-4">
             <li>
               <span className="font-bold">Tanpa cabang</span> — semua unit otomatis berada di

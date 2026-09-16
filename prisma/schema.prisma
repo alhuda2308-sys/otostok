@@ -1,4 +1,4 @@
-// OtoStok — Skema database manajemen stok showroom motor bekas (SQLite, lokal)
+// MotoStock — Skema database manajemen stok showroom motor bekas (SQLite, lokal)
 // Versi produksi Supabase/PostgreSQL: prisma/schema.postgres.prisma (model
 // identik). scripts/prisma-generate.sh memilih schema otomatis sesuai
 // DATABASE_URL. Migrasi SQL siap-jalankan: supabase/schema.sql

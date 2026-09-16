@@ -1,5 +1,5 @@
 /**
- * Seed OtoStok
+ * Seed MotoStock
  * - Lisensi demo (trial, bulanan, lifetime, expired)
  * - Showroom demo "Showroom Jaya Motor" (slug: showroom-jaya) dengan 10 unit motor
  *   (kategori & merk dari taxonomy, data mutasi masuk/keluar, 2 unit terjual utk laporan)

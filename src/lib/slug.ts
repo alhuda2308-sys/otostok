@@ -17,6 +17,7 @@ export function isReservedSlug(slug: string): boolean {
 
 export function isValidLicenseKey(key: string): boolean {
   const k = key.trim().toUpperCase()
-  // MTR-XXXX-XXXX (lisensi awal/demo) atau OTO-XXXX-XXXX-XXXX (generator Super Admin)
-  return /^(MTR-[A-Z0-9]{4}-[A-Z0-9]{4}|OTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})$/.test(k)
+  // MTR-XXXX-XXXX (lisensi awal/demo), OTO-XXXX-XXXX-XXXX (generator lama — tetap valid)
+  // atau MOTO-XXXX-XXXX-XXXX (generator Super Admin terbaru, rebranding MotoStock)
+  return /^(MTR-[A-Z0-9]{4}-[A-Z0-9]{4}|OTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}|MOTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})$/.test(k)
 }

@@ -273,7 +273,7 @@ export function CatalogClient({
             <a
               href={waLink(
                 showroom.ownerPhone,
-                `Halo ${showroom.name}, saya lihat katalog OtoStok Anda. Ada unit yang menarik.`,
+                `Halo ${showroom.name}, saya lihat katalog MotoStock Anda. Ada unit yang menarik.`,
               )}
               target="_blank"
               rel="noreferrer"

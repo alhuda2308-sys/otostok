@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { isValidLicenseKey } from '@/lib/slug'
 
 /**
- * GET /api/license-check?key=MTR-XXXX-XXXX
+ * GET /api/license-check?key=MOTO-XXXX-XXXX-XXXX
  * Cek cepat status lisensi untuk form aktivasi (live feedback).
  */
 export async function GET(req: Request) {

@@ -39,7 +39,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2.5">
             <AppIcon className="h-8 w-8" />
             <div className="leading-tight">
-              <span className="text-sm font-extrabold text-blue-700">OtoStok</span>
+              <span className="text-sm font-extrabold text-blue-700">MotoStock</span>
             </div>
           </div>
           <Button

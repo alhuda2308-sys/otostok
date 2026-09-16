@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto'
 
 /**
- * Auth ringan OtoStok:
+ * Auth ringan MotoStock:
  * - Password di-hash scrypt (salt acak, format "salt:hex").
  * - Sesi = cookie HttpOnly berisi payload JSON + tanda tangan HMAC-SHA256.
  * - Payload sesi terikat ke showroom (sid/slug) + role (owner|admin).

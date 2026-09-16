@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
     if (!isValidLicenseKey(licenseKey)) {
       return NextResponse.json(
-        { error: 'Format license key tidak valid. Gunakan format MTR-XXXX-XXXX atau OTO-XXXX-XXXX-XXXX.' },
+        { error: 'Format license key tidak valid. Gunakan format MOTO-XXXX-XXXX-XXXX (kode lama OTO-/MTR- tetap valid).' },
         { status: 400 },
       )
     }

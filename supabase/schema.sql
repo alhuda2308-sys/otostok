@@ -1,5 +1,5 @@
 -- ============================================================
--- OtoStok — Migrasi skema untuk Supabase (PostgreSQL)
+-- MotoStock — Migrasi skema untuk Supabase (PostgreSQL)
 -- ============================================================
 -- Cara pakai:
 --   1. Buka Supabase Dashboard → SQL Editor

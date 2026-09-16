@@ -38,13 +38,13 @@ function sanitizeFilename(s: string): string {
   )
 }
 
-/** Nama file foto tunggal, mis: otostok-honda-beat-dk-1234-foto-2.jpg */
+/** Nama file foto tunggal, mis: motostock-honda-beat-dk-1234-foto-2.jpg */
 export function buildPhotoFilename(
   v: Pick<PublicVehicle, 'brand' | 'model' | 'licensePlate'>,
   photoIndex: number,
 ): string {
   const base = sanitizeFilename(`${v.brand}-${v.model}-${v.licensePlate}`)
-  return `otostok-${base}-foto-${photoIndex + 1}.jpg`
+  return `motostock-${base}-foto-${photoIndex + 1}.jpg`
 }
 
 /** Ambil gambar (same-origin /uploads) sebagai File siap-share. */

@@ -1,4 +1,4 @@
-# Worklog — OtoStok
+# Worklog — MotoStock (rebranding dari OtoStok)
 
 Project: Aplikasi web full-stack manajemen stok showroom motor bekas + katalog marketing freelance.
 Stack: Next.js 16 (App Router), TypeScript, Tailwind CSS 4, shadcn/ui, Prisma (SQLite, portable ke Supabase/Postgres).
@@ -658,3 +658,24 @@ Stage Summary:
 - Pindah tab dashboard kini instan dari cache memori (<300ms, tanpa skeleton berulang); kunjungan ulang 88–156ms; data tetap segar via invalidateQueries setelah mutasi + refetch background saat stale >30s.
 - Keamanan tambahan: passwordHash tidak pernah keluar dari DB di endpoint staff.
 - Semua 4 poin permintaan user terpenuhi + push main (deploy Vercel otomatis).
+
+---
+Task ID: rebrand-otostok-to-motostock
+Agent: main (Z.ai Code)
+Task: Rebranding teks aplikasi "OtoStok" -> "MotoStock" + format lisensi baru MOTO- (lisensi lama tetap valid) + push main
+
+Work Log:
+- Rebase ke remote main terbaru (24 commit perf/migrasi dari sesi sebelumnya); skip commit worklog duplikat d0a6dea (entri setara sudah ada di remote); resolve konflik 4 file (schema.prisma, supabase/schema.sql, licenses route comment, worklog)
+- Pemetaan menyeluruh via Grep (case-insensitive "otostok") di seluruh source
+- Metadata: layout.tsx (title default/template, applicationName, appleWebApp.title) -> MotoStock; manifest.ts (name + short_name) -> MotoStock — diverifikasi via curl /manifest.webmanifest
+- Header UI: landing page.tsx, app-footer.tsx, alt app-icon.tsx, activate-client.tsx, branches-client.tsx ("Cara kerja cabang di MotoStock"), super-admin-client.tsx (2 heading), admin layout/menu bila ada
+- Template WA: catalog-client.tsx ("saya lihat katalog MotoStock Anda" — diverifikasi href wa.me aktual via agent-browser setelah login gerbang rekanan), super-admin-client.tsx ("*MotoStock — AKTIVASI LISENSI*" + "dari tim MotoStock")
+- Lisensi: generateLicenseKey() super-auth.ts kini MOTO-XXXX-XXXX-XXXX; isValidLicenseKey() menerima MOTO-|OTO-|MTR- (lisensi lama tetap valid); placeholder form & pesan error /api/activate & hint generator Super Admin diperbarui
+- Uji unit 9/9: MOTO-/OTO-/MTR- valid, format salah ditolak, generator 20x konsisten MOTO- tanpa karakter ambigu (I/O/0/1) di blok acak
+- package.json name otostok -> motostock; README title + format; komentar skema/seed
+- TIDAK DIUBAH (jaga sesi/data existing): cookie otostok_session & otostok_sa & otostok_mkt_*, storage otostok_sa_key, fallback AUTH_SECRET; bucket Supabase otostok-media/otostok-ktp
+- E2E agent-browser: halaman utama render bersih tanpa "OtoStok"; MOTO-TEST & OTO-TEST lolos regex form aktivasi; lint bersih
+
+Stage Summary:
+- Rebranding UI lengkap ke MotoStock tanpa menyentuh identifier teknis berisiko (cookie/session/bucket)
+- Generator lisensi baru MOTO-XXXX-XXXX-XXXX; validator menerima ketiga format — lisensi lama 100% tetap bisa diverifikasi/dipakai

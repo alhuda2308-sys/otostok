@@ -4,7 +4,7 @@ import { ActivateClient } from './activate-client'
 export const metadata: Metadata = {
   title: 'Aktivasi Lisensi',
   description:
-    'Aktifkan software OtoStok untuk showroom motor bekas Anda dengan license key.',
+    'Aktifkan software MotoStock untuk showroom motor bekas Anda dengan license key.',
 }
 
 export default function ActivatePage() {

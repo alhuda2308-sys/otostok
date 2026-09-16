@@ -10,7 +10,7 @@ import { SUPER_PLANS } from '@/lib/constants'
 import { dbErrorResponse, safeJsonBody } from '@/lib/db-errors'
 
 /**
- * API Super Admin — manajemen lisensi platform OtoStok.
+ * API Super Admin — manajemen lisensi platform MotoStock.
  * Autentikasi: cookie sesi otostok_sa (utama, dari /api/super-admin/session),
  * atau header X-Super-Secret, atau query ?key= / ?secret=, atau field body
  * "key" utk POST/PATCH. Terpisah total dari sesi Owner/Admin showroom.
@@ -98,7 +98,7 @@ export async function GET(req: Request) {
   }
 }
 
-/** POST: generate 1 lisensi baru (format OTO-XXXX-XXXX-XXXX) dengan status active. */
+/** POST: generate 1 lisensi baru (format MOTO-XXXX-XXXX-XXXX) dengan status active. */
 export async function POST(req: Request) {
   try {
     const body = await safeJsonBody(req)

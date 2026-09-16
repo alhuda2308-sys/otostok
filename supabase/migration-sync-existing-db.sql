@@ -1,5 +1,5 @@
 -- ============================================================
--- OtoStok — Migrasi SINKRONISASI untuk database Supabase yang SUDAH ADA
+-- MotoStock — Migrasi SINKRONISASI untuk database Supabase yang SUDAH ADA
 -- (v2 — tahan segala kondisi kolom: text[], json, jsonb, text)
 -- ============================================================
 -- KAPAN dipakai:

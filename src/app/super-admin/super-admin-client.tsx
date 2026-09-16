@@ -127,7 +127,7 @@ function planLabel(planType: string): string {
 /** Template pesan WA siap kirim ke pembeli lisensi. */
 function buildBuyerWaMessage(license: SuperLicenseRow): string {
   const lines: string[] = []
-  lines.push('*OtoStok — AKTIVASI LISENSI*')
+  lines.push('*MotoStock — AKTIVASI LISENSI*')
   lines.push('')
   lines.push(`Kode Lisensi : *${license.licenseKey}*`)
   lines.push(`Paket : ${planLabel(license.planType)}`)
@@ -486,7 +486,7 @@ export function SuperAdminClient() {
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-6 w-6 text-blue-700" aria-hidden />
-            <h1 className="text-base font-extrabold text-slate-900">OtoStok Super Admin</h1>
+            <h1 className="text-base font-extrabold text-slate-900">MotoStock Super Admin</h1>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
             Panel pengelola platform. Autentikasi memakai Master Secret Key — terpisah dari akun
@@ -535,7 +535,7 @@ export function SuperAdminClient() {
       <div className="flex flex-wrap items-center gap-3">
         <ShieldCheck className="h-6 w-6 text-blue-700" aria-hidden />
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-extrabold text-slate-900">OtoStok — Super Admin</h1>
+          <h1 className="text-lg font-extrabold text-slate-900">MotoStock — Super Admin</h1>
           <p className="text-xs text-slate-500">
             Generator lisensi & monitoring seluruh klien platform.
           </p>
@@ -584,7 +584,7 @@ export function SuperAdminClient() {
         <section className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
           <h2 className="text-sm font-extrabold text-slate-900">Generator Lisensi</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Buat kode lisensi baru format <span className="font-mono font-bold">OTO-XXXX-XXXX-XXXX</span>.
+            Buat kode lisensi baru format <span className="font-mono font-bold">MOTO-XXXX-XXXX-XXXX</span>.
           </p>
           <form onSubmit={handleGenerate} className="mt-4 space-y-3">
             <div>
@@ -865,7 +865,7 @@ function LicenseRowActions({
     <a
       href={waLink(
         row.showroom.ownerPhone,
-        `Halo ${row.showroom.name}, dari tim OtoStok. Terkait lisensi ${row.licenseKey}...`,
+        `Halo ${row.showroom.name}, dari tim MotoStock. Terkait lisensi ${row.licenseKey}...`,
       )}
       target="_blank"
       rel="noreferrer"

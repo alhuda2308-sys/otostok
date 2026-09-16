@@ -1,4 +1,4 @@
-// OtoStok — Skema PRODUKSI untuk Supabase/Postgres (deploy Vercel).
+// MotoStock — Skema PRODUKSI untuk Supabase/Postgres (deploy Vercel).
 // Varian dari prisma/schema.prisma (lokal = SQLite). Model identik — hanya
 // provider yang berbeda. Dipakai otomatis oleh scripts/prisma-generate.sh
 // saat DATABASE_URL berawalan postgres:// / postgresql:// (mis. di Vercel).

@@ -1,10 +1,10 @@
-# OtoStok
+# MotoStock
 
 Aplikasi manajemen stok & katalog pemasaran untuk **showroom motor bekas** — mobile-first PWA dengan sistem lisensi (self-service activation) dan katalog publik siap-bagis ke WhatsApp.
 
 ## Fitur
 
-- **/activate** — Aktivasi lisensi showroom (kode format `OTO-XXXX-XXXX-XXXX`)
+- **/activate** — Aktivasi lisensi showroom (kode format `MOTO-XXXX-XXXX-XXXX`; kode lama `OTO-`/`MTR-` tetap valid)
 - **/admin/[slug]** — Owner dashboard: kelola unit, foto, status Ready/Sold/Hold, checkout & DP tracking
 - **/s/[slug]** — Katalog publik: share materi iklan (Web Share API), galeri foto layar penuh dengan swipe, simpan foto per-unit
 - **/super-admin** — Modul master: generator lisensi (Trial / Bulanan / 6 Bulan / 1 Tahun / Lifetime), monitoring customer, suspend/extend

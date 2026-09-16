@@ -97,7 +97,8 @@ export function isSuperAuthorized(req: Request): boolean {
 }
 
 /**
- * Generator kode lisensi format OTO-XXXX-XXXX-XXXX.
+ * Generator kode lisensi format MOTO-XXXX-XXXX-XXXX.
+ * Lisensi lama berawalan OTO- tetap valid (lihat isValidLicenseKey di lib/slug.ts).
  * Charset tanpa karakter ambigu (I, O, 0, 1) agar mudah dibaca/dikirim via WA.
  */
 const KEY_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -112,5 +113,5 @@ function randomBlock(length: number): string {
 }
 
 export function generateLicenseKey(): string {
-  return `OTO-${randomBlock(4)}-${randomBlock(4)}-${randomBlock(4)}`
+  return `MOTO-${randomBlock(4)}-${randomBlock(4)}-${randomBlock(4)}`
 }

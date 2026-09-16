@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'OtoStok — Stok & Katalog Motor Bekas',
-    short_name: 'OtoStok',
+    name: 'MotoStock — Stok & Katalog Motor Bekas',
+    short_name: 'MotoStock',
     description:
       'Manajemen stok showroom motor bekas & katalog marketing freelance dengan sistem lisensi mandiri.',
     start_url: '/',
