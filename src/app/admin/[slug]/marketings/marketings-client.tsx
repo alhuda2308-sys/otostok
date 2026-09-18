@@ -311,30 +311,30 @@ function MarketingsPage({
       />
       <AdminNav slug={slug} role={session.role} />
 
-      {/* max-w-4xl di bawah xl (konten pas dgn header); xl: max-w-6xl agar
-          tabel 9 kolom rekanan muat TANPA scroll/memotong tombol Link Toko */}
-      <div className="mx-auto w-full max-w-4xl flex-1 space-y-4 px-4 py-4 xl:max-w-6xl">
+      {/* max-w-7xl konsisten dengan tab lain — tabel 9 kolom rekanan memakai
+          overflow-x-auto + min-w sehingga MENGGULIR, tidak pernah memotong tombol */}
+      <div className="mx-auto w-full max-w-7xl flex-1 space-y-4 px-4 py-4 sm:px-6 lg:space-y-5 lg:px-10 lg:py-6">
         {/* Kartu utama: Link Katalog Utama Showroom (Khusus Owner)
             — salin & bagikan langsung ke pembeli tanpa perantara marketing. */}
         {isOwner && (
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:rounded-2xl lg:p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="flex flex-wrap items-center gap-1.5 text-sm font-extrabold text-slate-900">
-                  <Store className="h-4 w-4 shrink-0 text-blue-700" aria-hidden />
+                <h3 className="flex flex-wrap items-center gap-1.5 text-sm font-extrabold text-slate-900 lg:text-base">
+                  <Store className="h-4 w-4 shrink-0 text-blue-700 lg:h-5 lg:w-5" aria-hidden />
                   Link Katalog Utama Showroom
                   <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-extrabold text-blue-700">
                     KHUSUS OWNER
                   </span>
                 </h3>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 lg:text-sm">
                   Link resmi katalog tanpa perantara marketing — semua chat WhatsApp pembeli
                   langsung masuk ke nomor resmi showroom. Dibuka dalam mode Owner bersih
                   (atribusi mitra tersimpan di browser otomatis dibersihkan).
                 </p>
                 <p
                   dir="ltr"
-                  className="mt-2 truncate rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-[11px] text-slate-700"
+                  className="mt-2 truncate rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-[11px] text-slate-700 lg:text-xs"
                 >
                   {origin ? `${origin}/s/${slug}` : `/s/${slug}`}
                 </p>
@@ -342,18 +342,18 @@ function MarketingsPage({
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
-                className="h-10 bg-blue-700 px-3 text-xs font-extrabold hover:bg-blue-800"
+                className="h-10 rounded-lg bg-blue-700 px-3.5 text-xs font-extrabold hover:bg-blue-800 lg:h-11 lg:rounded-xl lg:px-5 lg:text-sm"
                 onClick={handleCopyMainLink}
               >
-                <Copy className="mr-1 h-3.5 w-3.5" /> Salin Link Katalog
+                <Copy className="h-3.5 w-3.5 lg:h-4 lg:w-4" /> Salin Link Katalog
               </Button>
               <Button
                 variant="outline"
                 asChild
-                className="h-10 border-slate-300 px-3 text-xs font-extrabold"
+                className="h-10 rounded-lg border-slate-300 px-3.5 text-xs font-extrabold lg:h-11 lg:rounded-xl lg:px-5 lg:text-sm"
               >
                 <a href={`/s/${slug}?owner=1`} target="_blank" rel="noreferrer">
-                  <ExternalLink className="mr-1 h-3.5 w-3.5" /> Buka Katalog
+                  <ExternalLink className="h-3.5 w-3.5 lg:h-4 lg:w-4" /> Buka Katalog
                 </a>
               </Button>
             </div>
@@ -361,7 +361,7 @@ function MarketingsPage({
         )}
 
         {/* Info cara kerja whitelist */}
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-900">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-900 lg:rounded-2xl lg:p-5 lg:text-sm">
           <p className="font-extrabold">Sistem Rekanan Terdaftar (Whitelist WhatsApp):</p>
           <ul className="mt-1.5 list-disc space-y-1 pl-4">
             <li>
@@ -391,10 +391,10 @@ function MarketingsPage({
 
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900">
+            <h2 className="text-sm font-extrabold text-slate-900 lg:text-lg">
               Daftar Rekanan Marketing ({partners.length})
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 lg:text-sm">
               {partners.length === 0
                 ? 'Belum ada rekanan — katalog masih terbuka untuk umum.'
                 : 'Katalog terkunci: hanya nomor rekanan aktif yang bisa masuk.'}
@@ -402,10 +402,10 @@ function MarketingsPage({
           </div>
           {isOwner && (
             <Button
-              className="h-11 shrink-0 bg-blue-700 px-4 text-sm font-extrabold hover:bg-blue-800"
+              className="h-11 shrink-0 rounded-lg bg-blue-700 px-4 text-sm font-extrabold hover:bg-blue-800 lg:h-12 lg:rounded-xl lg:px-5 lg:text-base"
               onClick={openCreate}
             >
-              <Plus className="mr-1 h-4 w-4" /> Tambah Rekanan
+              <Plus className="h-4 w-4 lg:h-5 lg:w-5" /> Tambah Rekanan
             </Button>
           )}
         </div>
@@ -418,7 +418,7 @@ function MarketingsPage({
         )}
 
         {!loading && partners.length === 0 && (
-          <div className="flex flex-col items-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
             <Megaphone className="h-8 w-8 text-slate-300" aria-hidden />
             <p className="mt-2 text-sm font-bold text-slate-700">Belum ada rekanan terdaftar.</p>
             <p className="mt-1 max-w-xs text-xs text-slate-500">
@@ -426,10 +426,10 @@ function MarketingsPage({
             </p>
             {isOwner && (
               <Button
-                className="mt-4 h-11 bg-blue-700 font-bold hover:bg-blue-800"
+                className="mt-4 h-11 rounded-lg bg-blue-700 font-bold hover:bg-blue-800 lg:h-12 lg:rounded-xl lg:text-base"
                 onClick={openCreate}
               >
-                <Plus className="mr-1 h-4 w-4" /> Tambah Rekanan Pertama
+                <Plus className="h-4 w-4 lg:h-5 lg:w-5" /> Tambah Rekanan Pertama
               </Button>
             )}
           </div>
@@ -441,42 +441,49 @@ function MarketingsPage({
             overflow-hidden memotong tombol di kanan pada layar 768–1200px). */}
         {!loading && partners.length > 0 && (
           <>
-            <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm lg:block">
-              <table className="w-full min-w-[840px] table-fixed text-left text-sm">
+            <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
+              <table className="w-full min-w-[1160px] table-fixed text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-                    <th className="w-[130px] px-3 py-2.5 font-extrabold">Nama</th>
-                    <th className="w-[136px] px-3 py-2.5 font-extrabold">WhatsApp</th>
-                    <th className="w-[78px] px-3 py-2.5 font-extrabold">Domisili</th>
-                    <th className="w-[102px] px-2 py-2.5 text-center font-extrabold">Performa</th>
-                    <th className="w-[60px] px-2 py-2.5 font-extrabold">Status</th>
-                    <th className="hidden w-[95px] px-3 py-2.5 font-extrabold xl:table-cell">Terdaftar</th>
-                    <th className="w-[80px] px-2 py-2.5 text-center font-extrabold">KTP</th>
-                    <th className="w-[165px] px-2 py-2.5 font-extrabold">Link Toko</th>
-                    <th className="w-[88px] px-2 py-2.5 text-right font-extrabold">Aksi</th>
+                    <th className="w-[170px] px-4 py-3.5 font-extrabold">Nama</th>
+                    <th className="w-[160px] px-4 py-3.5 font-extrabold">WhatsApp &amp; Kode</th>
+                    <th className="w-[100px] px-3 py-3.5 font-extrabold">Domisili</th>
+                    <th className="w-[130px] px-3 py-3.5 text-center font-extrabold">Performa</th>
+                    <th className="w-[64px] px-2 py-3.5 font-extrabold">Status</th>
+                    <th className="hidden w-[110px] px-3 py-3.5 font-extrabold xl:table-cell">Terdaftar</th>
+                    <th className="w-[100px] px-3 py-3.5 text-center font-extrabold">KTP</th>
+                    <th className="w-[220px] px-3 py-3.5 font-extrabold">Link Toko</th>
+                    <th className="w-[106px] px-3 py-3.5 text-right font-extrabold">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {partners.map((m) => (
                     <tr key={m.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-3 py-3">
-                        <p className="truncate font-extrabold text-slate-900" title={m.fullName}>{m.fullName}</p>
+                      <td className="px-4 py-4">
+                        <p className="truncate text-base font-bold text-slate-900" title={m.fullName}>{m.fullName}</p>
                         {m.notes && (
-                          <p className="mt-0.5 truncate text-[11px] text-slate-500" title={m.notes}>
+                          <p className="mt-0.5 truncate text-xs text-slate-500" title={m.notes}>
                             {m.notes}
                           </p>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 font-bold text-slate-700">
-                        {formatPhoneDisplay(m.phoneNumber)}
+                      <td className="whitespace-nowrap px-4 py-4">
+                        <p className="text-sm font-medium text-slate-700">
+                          {formatPhoneDisplay(m.phoneNumber)}
+                        </p>
+                        {m.code && (
+                          <p className="mt-0.5 font-mono text-xs font-bold text-blue-700" title="Kode referral">
+                            {m.code}
+                          </p>
+                        )}
                       </td>
-                      <td className="px-3 py-3 text-slate-700">{m.addressCity}</td>
-                      <td className="whitespace-nowrap px-2 py-3 text-center text-[11px]">
-                        <span className="font-bold text-amber-700">Tahan {m.holdCount}</span>
+                      <td className="px-3 py-4 text-sm text-slate-700">{m.addressCity}</td>
+                      <td className="whitespace-nowrap px-3 py-4 text-center">
+                        <span className="text-sm font-bold text-amber-700">Tahan {m.holdCount}</span>
                         <span className="mx-1 text-slate-300">•</span>
-                        <span className="font-bold text-emerald-700">Laku {m.soldCount}</span>
+                        <span className="text-base font-extrabold text-emerald-600">Laku {m.soldCount}</span>
                       </td>
-                      <td className="px-2 py-3">
+                      <td className="px-2 py-4">
                         {isOwner ? (
                           <Switch
                             checked={m.isActive}
@@ -496,30 +503,30 @@ function MarketingsPage({
                           </span>
                         )}
                       </td>
-                      <td className="hidden whitespace-nowrap px-3 py-3 text-xs text-slate-600 xl:table-cell">
+                      <td className="hidden whitespace-nowrap px-3 py-4 text-sm text-slate-600 xl:table-cell">
                         {formatDateID(m.createdAt)}
                       </td>
-                      <td className="px-2 py-3 text-center">
+                      <td className="px-3 py-4 text-center">
                         {m.hasKtp ? (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 border-slate-300 px-2 text-xs font-bold"
+                            className="h-10 rounded-lg border-slate-300 px-3.5 text-sm font-semibold"
                             onClick={() => setKtpPreview(m)}
                           >
-                            <FileImage className="mr-1 h-3.5 w-3.5" /> Lihat
+                            <FileImage className="h-4 w-4" /> Lihat
                           </Button>
                         ) : (
-                          <span className="text-[11px] text-slate-400">—</span>
+                          <span className="text-sm text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-2 py-3">
-                        <div className="flex flex-col items-start gap-1">
+                      <td className="px-3 py-4">
+                        <div className="flex flex-col items-start gap-1.5">
                           {/* Buka katalog publik BERSIH dgn referral mitra ini (tab baru) */}
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 border-slate-300 px-2 text-[11px] font-extrabold"
+                            className="h-10 rounded-lg border-slate-300 px-3.5 text-sm font-semibold"
                             asChild
                           >
                             <a
@@ -528,14 +535,14 @@ function MarketingsPage({
                               rel="noreferrer"
                               title={`Buka katalog publik dengan referral ${m.fullName}`}
                             >
-                              <Store className="mr-1 h-3.5 w-3.5" /> Link Toko Publik
+                              <Store className="h-4 w-4" /> Link Toko Publik
                             </a>
                           </Button>
                           {/* Portal Kerja — halaman internal alat marketing (tab baru) */}
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 border-slate-300 px-2 text-[11px] font-extrabold"
+                            className="h-10 rounded-lg border-slate-300 px-3.5 text-sm font-semibold"
                             asChild
                           >
                             <a
@@ -544,13 +551,13 @@ function MarketingsPage({
                               rel="noreferrer"
                               title={`Buka Portal Kerja marketing untuk ${m.fullName}`}
                             >
-                              <Briefcase className="mr-1 h-3.5 w-3.5" /> Link Portal Kerja
+                              <Briefcase className="h-4 w-4" /> Link Portal Kerja
                             </a>
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 border-emerald-200 bg-emerald-50 px-2 text-[11px] font-extrabold text-emerald-800 hover:bg-emerald-100"
+                            className="h-10 rounded-lg border-emerald-200 bg-emerald-50 px-3.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
                             asChild
                           >
                             <a
@@ -559,35 +566,35 @@ function MarketingsPage({
                               rel="noreferrer"
                               title={`Kirim link toko via WhatsApp ke ${m.fullName}`}
                             >
-                              <MessageCircle className="mr-1 h-3.5 w-3.5" /> Kirim Link via WA
+                              <MessageCircle className="h-4 w-4" /> Kirim Link via WA
                             </a>
                           </Button>
                         </div>
                       </td>
-                      <td className="px-2 py-3">
+                      <td className="px-3 py-4">
                         {isOwner ? (
                           <div className="flex justify-end gap-1.5">
                             <Button
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8 border-slate-300"
+                              className="h-10 w-10 rounded-lg border-slate-300"
                               onClick={() => openEdit(m)}
                               aria-label={`Edit data ${m.fullName}`}
                             >
-                              <Pencil className="h-3.5 w-3.5 text-slate-600" />
+                              <Pencil className="h-4 w-4 text-slate-600" />
                             </Button>
                             <Button
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8 border-slate-300 hover:bg-red-50"
+                              className="h-10 w-10 rounded-lg border-slate-300 hover:bg-red-50"
                               onClick={() => setDeleteTarget(m)}
                               aria-label={`Hapus ${m.fullName}`}
                             >
-                              <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                              <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
                           </div>
                         ) : (
-                          <span className="block text-right text-[11px] text-slate-400">—</span>
+                          <span className="block text-right text-sm text-slate-400">—</span>
                         )}
                       </td>
                     </tr>
@@ -728,9 +735,9 @@ function MarketingsPage({
 
       {/* Dialog tambah/edit rekanan */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md lg:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-base font-extrabold">
+            <DialogTitle className="text-base font-extrabold lg:text-lg">
               {editing ? `Edit Rekanan — ${editing.fullName}` : 'Tambah Rekanan Marketing'}
             </DialogTitle>
             <DialogDescription>
@@ -742,13 +749,13 @@ function MarketingsPage({
 
           <form onSubmit={submit} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="m-name">Nama Lengkap *</Label>
+              <Label htmlFor="m-name" className="font-semibold text-slate-700">Nama Lengkap *</Label>
               <Input
                 id="m-name"
                 value={form.fullName}
                 onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
                 placeholder="cth: Deni Prasetyo"
-                className="h-11"
+                className="h-12 rounded-xl px-4 text-base md:text-base"
                 autoFocus
                 required
                 minLength={2}
@@ -756,7 +763,7 @@ function MarketingsPage({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="m-phone">Nomor WhatsApp Aktif *</Label>
+              <Label htmlFor="m-phone" className="font-semibold text-slate-700">Nomor WhatsApp Aktif *</Label>
               <Input
                 id="m-phone"
                 value={form.phoneNumber}
@@ -765,34 +772,34 @@ function MarketingsPage({
                 }
                 inputMode="tel"
                 placeholder="cth: 0812 3456 7890"
-                className="h-11"
+                className="h-12 rounded-xl px-4 text-base md:text-base"
                 required
               />
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 Format standar Indonesia 08xxx. Nomor ini yang dipakai verifikasi katalog.
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="m-city">Domisili / Kota Asal *</Label>
+              <Label htmlFor="m-city" className="font-semibold text-slate-700">Domisili / Kota Asal *</Label>
               <Input
                 id="m-city"
                 value={form.addressCity}
                 onChange={(e) => setForm((f) => ({ ...f, addressCity: e.target.value }))}
                 placeholder="cth: Bekasi"
-                className="h-11"
+                className="h-12 rounded-xl px-4 text-base md:text-base"
                 required
                 maxLength={60}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="m-notes">Catatan Khusus Owner</Label>
+              <Label htmlFor="m-notes" className="font-semibold text-slate-700">Catatan Khusus Owner</Label>
               <Textarea
                 id="m-notes"
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 placeholder="cth: Rekomendasi Mas Budi — spesialis motor sport"
                 rows={2}
-                className="resize-none"
+                className="resize-none rounded-xl p-4 text-base md:text-base"
                 maxLength={300}
               />
             </div>
@@ -826,7 +833,7 @@ function MarketingsPage({
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-9 border-slate-300 text-xs font-bold"
+                      className="h-11 rounded-lg border-slate-300 px-4 text-sm font-semibold"
                       disabled={uploadingKtp}
                       onClick={() => ktpInputRef.current?.click()}
                     >
@@ -864,7 +871,7 @@ function MarketingsPage({
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 border-slate-300 font-bold"
+                className="h-12 rounded-xl border-slate-300 font-semibold"
                 onClick={() => setDialogOpen(false)}
               >
                 Batal
@@ -872,7 +879,7 @@ function MarketingsPage({
               <Button
                 type="submit"
                 disabled={saving}
-                className="h-11 flex-1 bg-blue-700 text-sm font-extrabold hover:bg-blue-800"
+                className="h-12 flex-1 rounded-xl bg-blue-700 text-base font-extrabold hover:bg-blue-800"
               >
                 {saving ? 'Menyimpan...' : editing ? 'Simpan Perubahan' : 'Daftarkan Rekanan'}
               </Button>

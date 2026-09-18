@@ -136,49 +136,49 @@ function StaffPage({
       />
       <AdminNav slug={slug} role={session.role} />
 
-      <div className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 py-4">
+      <div className="mx-auto w-full max-w-7xl flex-1 space-y-4 px-4 py-4 sm:px-6 lg:space-y-5 lg:px-10 lg:py-6">
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
             {error}
           </div>
         )}
 
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 lg:text-sm">
             {items ? `${items.length} akun terdaftar` : 'Memuat...'}
           </p>
           <Button
-            className="h-10 bg-blue-700 px-4 text-sm font-extrabold hover:bg-blue-800"
+            className="h-11 rounded-lg bg-blue-700 px-4 text-sm font-extrabold hover:bg-blue-800 lg:h-12 lg:rounded-xl lg:px-5 lg:text-base"
             onClick={() => setCreateOpen(true)}
           >
-            <Plus className="mr-1 h-4 w-4" /> Buat Akun Admin
+            <Plus className="h-4 w-4 lg:h-5 lg:w-5" /> Buat Akun Admin
           </Button>
         </div>
 
-        <div className="space-y-2">
+        <div className="grid gap-2.5 lg:grid-cols-2">
           {items?.map((s) => (
             <div
               key={s.id}
-              className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between lg:rounded-2xl lg:px-6"
             >
               <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100">
-                  <UserRound className="h-5 w-5 text-slate-500" aria-hidden />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 lg:h-12 lg:w-12">
+                  <UserRound className="h-5 w-5 text-slate-500 lg:h-6 lg:w-6" aria-hidden />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-extrabold text-slate-900">
+                  <p className="truncate text-sm font-extrabold text-slate-900 lg:text-base">
                     {s.name}
                     {s.role === 'owner' && (
-                      <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-extrabold uppercase text-blue-700">
+                      <span className="ml-2 inline-flex rounded-md bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold uppercase text-blue-700 lg:px-3 lg:text-xs">
                         Owner
                       </span>
                     )}
                   </p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-xs text-slate-500 lg:text-sm">
                     @{s.username} • dibuat {formatDateID(s.createdAt)}
                   </p>
                   {!s.isActive && (
-                    <p className="mt-0.5 text-[11px] font-bold text-red-700">
+                    <p className="mt-0.5 text-xs font-bold text-red-700">
                       Dinonaktifkan — tidak bisa login
                     </p>
                   )}
@@ -186,7 +186,7 @@ function StaffPage({
               </div>
               {s.role !== 'owner' && (
                 <div className="flex shrink-0 items-center gap-3">
-                  <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-600 lg:text-sm">
                     <Switch
                       checked={s.isActive}
                       disabled={busyId === s.id}
@@ -198,7 +198,7 @@ function StaffPage({
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-9 w-9 border-slate-300 hover:bg-red-50"
+                    className="h-9 w-9 rounded-lg border-slate-300 hover:bg-red-50 lg:h-10 lg:w-10"
                     onClick={() => setDeleteTarget(s)}
                     aria-label={`Hapus akun ${s.name}`}
                   >
@@ -225,9 +225,9 @@ function StaffPage({
 
       {/* Dialog kredensial baru dibuat */}
       <Dialog open={created != null} onOpenChange={(o) => !o && setCreated(null)}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm lg:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-extrabold">Akun Admin Dibuat</DialogTitle>
+            <DialogTitle className="text-base font-extrabold lg:text-lg">Akun Admin Dibuat</DialogTitle>
             <DialogDescription>
               Bagikan kredensial berikut ke staf Anda — password tidak ditampilkan lagi
               setelah ini.
@@ -246,7 +246,7 @@ function StaffPage({
               </p>
               <Button
                 variant="outline"
-                className="mt-1 h-10 w-full border-slate-300 text-xs font-bold"
+                className="mt-1 h-11 w-full rounded-lg border-slate-300 text-sm font-bold"
                 onClick={async () => {
                   const ok = await copyToClipboard(
                     `Nama: ${created.name}\nUsername: ${created.username}\nPassword: ${created.password}`,
@@ -279,9 +279,9 @@ function StaffPage({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10">Batal</AlertDialogCancel>
+            <AlertDialogCancel className="h-11 rounded-lg">Batal</AlertDialogCancel>
             <AlertDialogAction
-              className="h-10 bg-red-700 font-bold hover:bg-red-800"
+              className="h-11 rounded-lg bg-red-700 font-bold hover:bg-red-800"
               onClick={(e) => {
                 e.preventDefault()
                 confirmDelete()
@@ -344,27 +344,27 @@ function CreateStaffDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm lg:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base font-extrabold">Buat Akun Admin Baru</DialogTitle>
+          <DialogTitle className="text-base font-extrabold lg:text-lg">Buat Akun Admin Baru</DialogTitle>
           <DialogDescription>
             Akun admin untuk staf internal showroom Anda.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="staff-name">Nama Lengkap *</Label>
+            <Label htmlFor="staff-name" className="font-semibold text-slate-700">Nama Lengkap *</Label>
             <Input
               id="staff-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="cth: Budi Santoso"
-              className="h-11"
+              className="h-12 rounded-xl px-4 text-base md:text-base"
               required
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="staff-username">Username *</Label>
+            <Label htmlFor="staff-username" className="font-semibold text-slate-700">Username *</Label>
             <Input
               id="staff-username"
               value={username}
@@ -372,19 +372,19 @@ function CreateStaffDialog({
               placeholder="cth: budi"
               autoCapitalize="none"
               autoCorrect="off"
-              className="h-11"
+              className="h-12 rounded-xl px-4 text-base md:text-base"
               required
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="staff-password">Password *</Label>
+            <Label htmlFor="staff-password" className="font-semibold text-slate-700">Password *</Label>
             <Input
               id="staff-password"
               type="text"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Minimal 6 karakter"
-              className="h-11"
+              className="h-12 rounded-xl px-4 text-base md:text-base"
               minLength={6}
               required
             />
@@ -398,7 +398,7 @@ function CreateStaffDialog({
             <Button
               type="button"
               variant="outline"
-              className="h-12 border-slate-300 font-bold"
+              className="h-12 flex-1 rounded-xl border-slate-300 font-semibold"
               onClick={() => onOpenChange(false)}
             >
               Batal
@@ -406,7 +406,7 @@ function CreateStaffDialog({
             <Button
               type="submit"
               disabled={busy}
-              className="h-12 flex-1 bg-blue-700 font-extrabold hover:bg-blue-800"
+              className="h-12 flex-1 rounded-xl bg-blue-700 text-base font-extrabold hover:bg-blue-800"
             >
               {busy ? 'Membuat...' : 'Buat Akun'}
             </Button>

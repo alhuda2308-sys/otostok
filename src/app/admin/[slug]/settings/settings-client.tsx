@@ -14,6 +14,7 @@ import { PhotoManager } from '@/components/photo-manager'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { normalizePhone } from '@/lib/format'
 import { ApiError, qk, useSettingsQuery } from '@/lib/queries'
 
@@ -129,109 +130,121 @@ function SettingsPage({
       />
       <AdminNav slug={slug} role={session.role} />
 
-      <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-4">
+      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-4 sm:px-6 lg:px-10 lg:py-6">
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
             {error}
           </div>
         )}
 
         {!data ? (
-          <div className="h-64 animate-pulse rounded-lg bg-slate-200" />
+          <div className="h-64 animate-pulse rounded-xl bg-slate-200" />
         ) : (
-          <form onSubmit={save} className="space-y-4">
-            {/* Identitas */}
-            <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="text-sm font-extrabold text-slate-900">Identitas Showroom</h2>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="st-name">Nama Showroom *</Label>
-                  <Input
-                    id="st-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="h-11"
+          <form onSubmit={save} className="space-y-5">
+            {/* Layout 2 kolom desktop: Identitas (kiri) + Branding (kanan) */}
+            <div className="grid gap-4 lg:grid-cols-2 lg:gap-8">
+              {/* Identitas */}
+              <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:rounded-2xl lg:p-6">
+                <h2 className="text-sm font-extrabold text-slate-900 lg:text-base">Identitas Showroom</h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="st-name" className="font-semibold text-slate-700">Nama Showroom *</Label>
+                    <Input
+                      id="st-name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="h-12 rounded-xl px-4 text-base md:text-base"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="st-slug" className="font-semibold text-slate-700">Slug Katalog (tetap)</Label>
+                    <Input
+                      id="st-slug"
+                      value={data.slug}
+                      disabled
+                      className="h-12 rounded-xl bg-slate-50 px-4 font-mono text-base"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="st-address" className="font-semibold text-slate-700">Alamat Lengkap *</Label>
+                  <Textarea
+                    id="st-address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="cth: Jl. Raya Bekasi KM 25, Cakung, Jakarta Timur"
+                    className="min-h-[120px] resize-none rounded-xl p-4 text-base md:text-base"
+                    maxLength={300}
                     required
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="st-slug">Slug Katalog (tetap)</Label>
-                  <Input id="st-slug" value={data.slug} disabled className="h-11 bg-slate-50 font-mono" />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="st-wa" className="font-semibold text-slate-700">No. WhatsApp Admin *</Label>
+                    <Input
+                      id="st-wa"
+                      value={ownerPhone}
+                      onChange={(e) => setOwnerPhone(e.target.value)}
+                      inputMode="tel"
+                      placeholder="08xxxxxxxxxx"
+                      className="h-12 rounded-xl px-4 text-base md:text-base"
+                      required
+                    />
+                    <p className="text-xs text-slate-400">
+                      Tombol &quot;Chat Showroom&quot; di katalog memakai nomor ini.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="st-maps" className="font-semibold text-slate-700">Link Google Maps</Label>
+                    <Input
+                      id="st-maps"
+                      value={mapsUrl}
+                      onChange={(e) => setMapsUrl(e.target.value)}
+                      placeholder="https://maps.app.goo.gl/..."
+                      className="h-12 rounded-xl px-4 text-base md:text-base"
+                      type="url"
+                    />
+                    <p className="text-xs text-slate-400">
+                      Tampil sebagai tombol &quot;Lihat di Google Maps&quot; di katalog.
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="st-address">Alamat Lengkap *</Label>
-                <Input
-                  id="st-address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="cth: Jl. Raya Bekasi KM 25, Cakung, Jakarta Timur"
-                  className="h-11"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="st-wa">No. WhatsApp Admin *</Label>
-                  <Input
-                    id="st-wa"
-                    value={ownerPhone}
-                    onChange={(e) => setOwnerPhone(e.target.value)}
-                    inputMode="tel"
-                    placeholder="08xxxxxxxxxx"
-                    className="h-11"
-                    required
-                  />
-                  <p className="text-[11px] text-slate-400">
-                    Tombol &quot;Chat Showroom&quot; di katalog memakai nomor ini.
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="st-maps">Link Google Maps</Label>
-                  <Input
-                    id="st-maps"
-                    value={mapsUrl}
-                    onChange={(e) => setMapsUrl(e.target.value)}
-                    placeholder="https://maps.app.goo.gl/..."
-                    className="h-11"
-                    type="url"
-                  />
-                  <p className="text-[11px] text-slate-400">
-                    Tampil sebagai tombol &quot;Lihat di Google Maps&quot; di katalog.
-                  </p>
-                </div>
-              </div>
-            </section>
+              </section>
 
-            {/* Branding */}
-            <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="text-sm font-extrabold text-slate-900">Logo &amp; Foto Header</h2>
-              <PhotoManager
-                photos={logo}
-                onChange={setLogo}
-                maxPhotos={1}
-                withCover={false}
-                label="Logo Showroom"
-                hint="Tampil di header katalog & dashboard (rasio persegi disarankan)"
-              />
-              <PhotoManager
-                photos={header}
-                onChange={setHeader}
-                maxPhotos={1}
-                withCover={false}
-                label="Foto Header Katalog"
-                hint="Banner foto depan showroom / unit andalan (rasio lebar disarankan)"
-              />
-            </section>
+              {/* Branding */}
+              <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:rounded-2xl lg:p-6">
+                <h2 className="text-sm font-extrabold text-slate-900 lg:text-base">Logo &amp; Foto Header</h2>
+                <PhotoManager
+                  photos={logo}
+                  onChange={setLogo}
+                  maxPhotos={1}
+                  withCover={false}
+                  logoMode
+                  label="Logo Showroom"
+                  hint="Persegi disarankan — tampil di header katalog & dashboard"
+                />
+                <div className="border-t border-slate-100 pt-4">
+                  <PhotoManager
+                    photos={header}
+                    onChange={setHeader}
+                    maxPhotos={1}
+                    withCover={false}
+                    label="Foto Header Katalog"
+                    hint="Banner foto depan showroom / unit andalan (rasio lebar disarankan)"
+                  />
+                </div>
+              </section>
+            </div>
 
             <div className="flex justify-end">
               <Button
                 type="submit"
                 disabled={saving}
-                className="h-12 w-full bg-blue-700 px-6 text-sm font-extrabold hover:bg-blue-800 sm:w-auto"
+                className="h-12 w-full rounded-xl bg-blue-700 px-8 text-base font-extrabold hover:bg-blue-800 lg:w-auto"
               >
-                <Save className="mr-1 h-4 w-4" />
-                {saving ? 'Menyimpan...' : 'Simpan Pengaturan'}
+                <Save className="h-5 w-5" />
+                {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
               </Button>
             </div>
           </form>

@@ -131,16 +131,16 @@ function ReportsPage({
       />
       <AdminNav slug={slug} role={session.role} />
 
-      <div className="mx-auto w-full max-w-5xl flex-1 space-y-4 px-4 py-4">
+      <div className="mx-auto w-full max-w-7xl flex-1 space-y-4 px-4 py-4 sm:px-6 lg:space-y-6 lg:px-10 lg:py-6">
         {/* Filter rentang waktu */}
-        <section className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center">
-          <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+        <section className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center lg:rounded-xl lg:p-4">
+          <div className="flex rounded-lg border border-slate-300 bg-white p-0.5 lg:rounded-xl lg:p-1">
             {PRESETS.map((p) => (
               <button
                 key={p.key}
                 type="button"
                 onClick={() => setPreset(p.key)}
-                className={`h-9 flex-1 whitespace-nowrap rounded-md px-3 text-xs font-bold sm:flex-none ${
+                className={`h-9 flex-1 whitespace-nowrap rounded-md px-3 text-xs font-bold sm:flex-none lg:h-11 lg:rounded-lg lg:px-5 lg:text-sm lg:font-semibold ${
                   preset === p.key
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:bg-slate-100'
@@ -156,31 +156,31 @@ function ReportsPage({
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-9 text-xs"
+                className="h-9 rounded-xl text-xs sm:h-10 lg:h-11 lg:text-sm font-medium"
                 aria-label="Dari tanggal"
               />
-              <span className="text-xs font-bold text-slate-400">s/d</span>
+              <span className="text-xs font-bold text-slate-400 lg:text-sm">s/d</span>
               <Input
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="h-9 text-xs"
+                className="h-9 rounded-xl text-xs sm:h-10 lg:h-11 lg:text-sm font-medium"
                 aria-label="Sampai tanggal"
               />
             </div>
           )}
           {preset !== 'custom' && (
-            <p className="text-xs font-semibold text-slate-500">
+            <p className="text-xs font-semibold text-slate-500 lg:text-sm">
               {formatDateID(range.from)} — {formatDateID(range.to)}
             </p>
           )}
           <Button
             variant="outline"
-            className="h-9 shrink-0 border-slate-300 text-xs font-bold sm:ml-auto"
+            className="h-9 shrink-0 rounded-lg border-slate-300 text-xs font-bold sm:ml-auto lg:h-12 lg:rounded-xl lg:px-5 lg:text-sm lg:font-bold"
             onClick={exportCsv}
             disabled={!data || data.items.length === 0}
           >
-            <Download className="mr-1 h-3.5 w-3.5" /> Ekspor ke CSV
+            <Download className="h-3.5 w-3.5 lg:h-4 lg:w-4" /> Ekspor Laporan (CSV)
           </Button>
         </section>
 
@@ -202,55 +202,55 @@ function ReportsPage({
         {data && !loading && (
           <>
             {/* Metrik */}
-            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">
+            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-6">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-red-700 lg:text-xs">
                   Unit Terjual
                 </p>
-                <p className="mt-1 text-2xl font-extrabold text-red-900">{data.totals.count}</p>
-                <p className="text-[11px] text-red-700">unit deal periode ini</p>
+                <p className="mt-1 text-2xl font-extrabold text-red-900 lg:mt-2 lg:text-4xl lg:font-black">{data.totals.count}</p>
+                <p className="text-[11px] text-red-700 lg:text-sm lg:font-medium">unit deal periode ini</p>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 lg:text-xs">
                   Total Omzet
                 </p>
-                <p className="mt-1 text-base font-extrabold leading-snug text-slate-900 sm:text-lg">
+                <p className="mt-1 text-base font-extrabold leading-snug tracking-tight text-slate-900 sm:text-lg lg:mt-2 lg:text-2xl xl:text-3xl xl:font-black">
                   {formatRupiah(data.totals.omzet)}
                 </p>
-                <p className="text-[11px] text-slate-400">akumulasi harga deal</p>
+                <p className="text-[11px] text-slate-400 lg:text-sm lg:font-medium">akumulasi harga deal</p>
               </div>
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 lg:text-xs">
                   Komisi Keluar
                 </p>
-                <p className="mt-1 text-base font-extrabold leading-snug text-emerald-900 sm:text-lg">
+                <p className="mt-1 text-base font-extrabold leading-snug tracking-tight text-emerald-900 sm:text-lg lg:mt-2 lg:text-2xl xl:text-3xl xl:font-black">
                   {formatRupiah(data.totals.commission)}
                 </p>
-                <p className="text-[11px] text-emerald-700">komisi marketing</p>
+                <p className="text-[11px] text-emerald-700 lg:text-sm lg:font-medium">komisi marketing</p>
               </div>
               {isOwner ? (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700 lg:text-xs">
                     Margin Laba Bersih
                   </p>
-                  <p className="mt-1 text-base font-extrabold leading-snug text-slate-900 sm:text-lg">
+                  <p className="mt-1 text-base font-extrabold leading-snug tracking-tight text-slate-900 sm:text-lg lg:mt-2 lg:text-2xl xl:text-3xl xl:font-black">
                     {formatRupiah(data.totals.margin)}
                   </p>
-                  <p className="text-[11px] text-blue-700">
+                  <p className="text-[11px] text-blue-700 lg:text-sm lg:font-medium">
                     omzet − modal ({formatRupiah(data.totals.capital)}) − komisi
                   </p>
                 </div>
               ) : (
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 lg:text-xs">
                     Rata-rata Deal
                   </p>
-                  <p className="mt-1 text-base font-extrabold leading-snug text-slate-900 sm:text-lg">
+                  <p className="mt-1 text-base font-extrabold leading-snug tracking-tight text-slate-900 sm:text-lg lg:mt-2 lg:text-2xl xl:text-3xl xl:font-black">
                     {formatRupiah(
                       data.totals.count > 0 ? Math.round(data.totals.omzet / data.totals.count) : 0,
                     )}
                   </p>
-                  <p className="text-[11px] text-slate-400">per unit terjual</p>
+                  <p className="text-[11px] text-slate-400 lg:text-sm lg:font-medium">per unit terjual</p>
                 </div>
               )}
             </section>
@@ -264,44 +264,44 @@ function ReportsPage({
                 </p>
               </div>
             ) : (
-              <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+              <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white lg:rounded-xl">
                 {/* Desktop: tabel — min-w + scroll, tidak pernah memotong kolom kanan */}
-                <table className="hidden w-full min-w-[820px] text-left text-sm md:table">
+                <table className="hidden w-full min-w-[860px] text-left text-sm md:table lg:min-w-[1020px]">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-                      <th className="px-4 py-2.5 font-bold">Tanggal</th>
-                      <th className="px-4 py-2.5 font-bold">Unit</th>
-                      <th className="px-4 py-2.5 font-bold">Plat</th>
-                      <th className="px-4 py-2.5 text-right font-bold">Harga Deal</th>
-                      <th className="px-4 py-2.5 text-right font-bold">Komisi</th>
-                      {isOwner && <th className="px-4 py-2.5 text-right font-bold">Margin</th>}
-                      <th className="px-4 py-2.5 font-bold">Marketing</th>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 lg:text-xs">
+                      <th className="px-4 py-2.5 font-bold lg:px-6 lg:py-3.5">Tanggal</th>
+                      <th className="px-4 py-2.5 font-bold lg:px-6 lg:py-3.5">Unit</th>
+                      <th className="px-4 py-2.5 font-bold lg:px-6 lg:py-3.5">Plat</th>
+                      <th className="px-4 py-2.5 text-right font-bold lg:px-6 lg:py-3.5">Harga Deal</th>
+                      <th className="px-4 py-2.5 text-right font-bold lg:px-6 lg:py-3.5">Komisi</th>
+                      {isOwner && <th className="px-4 py-2.5 text-right font-bold lg:px-6 lg:py-3.5">Margin</th>}
+                      <th className="px-4 py-2.5 font-bold lg:px-6 lg:py-3.5">Marketing</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.items.map((it) => (
                       <tr key={it.id} className="border-b border-slate-100 last:border-0">
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-600">
+                        <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-600 lg:px-6 lg:py-4 lg:text-sm">
                           {formatDateID(it.soldAt)}
                         </td>
-                        <td className="px-4 py-3 font-bold text-slate-900">
+                        <td className="px-4 py-3 font-bold text-slate-900 lg:px-6 lg:py-4 lg:text-base">
                           {it.brand} {it.model}
                         </td>
-                        <td className="px-4 py-3 text-xs font-bold text-slate-600">
+                        <td className="px-4 py-3 text-xs font-bold text-slate-600 lg:px-6 lg:py-4 lg:text-sm">
                           {it.licensePlate}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-extrabold text-slate-900">
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-extrabold text-slate-900 lg:px-6 lg:py-4 lg:text-base">
                           {formatRupiah(it.soldPrice)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-emerald-700">
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-emerald-700 lg:px-6 lg:py-4 lg:text-base">
                           {formatRupiah(it.commissionAmount)}
                         </td>
                         {isOwner && (
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-blue-800">
+                          <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-blue-800 lg:px-6 lg:py-4 lg:text-base">
                             {formatRupiah(it.margin)}
                           </td>
                         )}
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-600 lg:px-6 lg:py-4 lg:text-sm">
                           {it.soldBy ?? '-'}
                         </td>
                       </tr>
@@ -309,17 +309,17 @@ function ReportsPage({
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-slate-200 bg-slate-50">
-                      <td className="px-4 py-3 text-xs font-extrabold uppercase text-slate-500" colSpan={3}>
+                      <td className="px-4 py-3 text-xs font-extrabold uppercase text-slate-500 lg:px-6 lg:py-4 lg:text-sm" colSpan={3}>
                         Total ({data.totals.count} unit)
                       </td>
-                      <td className="px-4 py-3 text-right font-extrabold text-slate-900">
+                      <td className="px-4 py-3 text-right font-extrabold text-slate-900 lg:px-6 lg:py-4 lg:text-base">
                         {formatRupiah(data.totals.omzet)}
                       </td>
-                      <td className="px-4 py-3 text-right font-extrabold text-emerald-700">
+                      <td className="px-4 py-3 text-right font-extrabold text-emerald-700 lg:px-6 lg:py-4 lg:text-base">
                         {formatRupiah(data.totals.commission)}
                       </td>
                       {isOwner && (
-                        <td className="px-4 py-3 text-right font-extrabold text-blue-800">
+                        <td className="px-4 py-3 text-right font-extrabold text-blue-800 lg:px-6 lg:py-4 lg:text-base">
                           {formatRupiah(data.totals.margin)}
                         </td>
                       )}
@@ -329,7 +329,7 @@ function ReportsPage({
                 </table>
 
                 {/* Mobile: kartu */}
-                <ul className="divide-y divide-slate-100 md:hidden">
+                <ul className="divide-y divide-slate-100 lg:hidden">
                   {data.items.map((it) => (
                     <li key={it.id} className="p-4">
                       <div className="flex items-start justify-between gap-2">

@@ -188,9 +188,9 @@ function BranchesPage({
       />
       <AdminNav slug={slug} role={session.role} />
 
-      <div className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 py-4">
+      <div className="mx-auto w-full max-w-7xl flex-1 space-y-4 px-4 py-4 sm:px-6 lg:space-y-5 lg:px-10 lg:py-6">
         {/* Info perilaku otomatis */}
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-900">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-900 lg:rounded-2xl lg:p-5 lg:text-sm">
           <p className="font-extrabold">Cara kerja cabang di MotoStock:</p>
           <ul className="mt-1.5 list-disc space-y-1 pl-4">
             <li>
@@ -208,18 +208,18 @@ function BranchesPage({
 
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900">
+            <h2 className="text-sm font-extrabold text-slate-900 lg:text-lg">
               Daftar Cabang ({branches.length})
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 lg:text-sm">
               Unit di lokasi utama tidak perlu dipilih apa pun — otomatis.
             </p>
           </div>
           <Button
-            className="h-11 shrink-0 bg-blue-700 px-4 text-sm font-extrabold hover:bg-blue-800"
+            className="h-11 shrink-0 rounded-lg bg-blue-700 px-4 text-sm font-extrabold hover:bg-blue-800 lg:h-12 lg:rounded-xl lg:px-5 lg:text-base"
             onClick={openCreate}
           >
-            <Plus className="mr-1 h-4 w-4" /> Tambah Cabang
+            <Plus className="h-4 w-4 lg:h-5 lg:w-5" /> Tambah Cabang
           </Button>
         </div>
 
@@ -231,7 +231,7 @@ function BranchesPage({
         )}
 
         {!loading && branches.length === 0 && (
-          <div className="flex flex-col items-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
             <Building2 className="h-8 w-8 text-slate-300" aria-hidden />
             <p className="mt-2 text-sm font-bold text-slate-700">Belum ada cabang terdaftar.</p>
             <p className="mt-1 max-w-xs text-xs text-slate-500">
@@ -239,29 +239,29 @@ function BranchesPage({
               disimpan di tempat lain.
             </p>
             <Button
-              className="mt-4 h-11 bg-blue-700 font-bold hover:bg-blue-800"
+              className="mt-4 h-11 rounded-lg bg-blue-700 font-bold hover:bg-blue-800 lg:h-12 lg:rounded-xl lg:text-base"
               onClick={openCreate}
             >
-              <Plus className="mr-1 h-4 w-4" /> Tambah Cabang Pertama
+              <Plus className="h-4 w-4 lg:h-5 lg:w-5" /> Tambah Cabang Pertama
             </Button>
           </div>
         )}
 
         {!loading && branches.length > 0 && (
-          <div className="space-y-2.5">
+          <div className="grid gap-3 lg:grid-cols-2 lg:gap-5 xl:grid-cols-3">
             {branches.map((b) => (
               <article
                 key={b.id}
-                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:rounded-2xl lg:p-6"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900">
-                      <Building2 className="h-4 w-4 shrink-0 text-blue-700" aria-hidden />
+                    <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900 lg:text-xl">
+                      <Building2 className="h-4 w-4 shrink-0 text-blue-700 lg:h-5 lg:w-5" aria-hidden />
                       {b.name}
                     </h3>
-                    <p className="mt-1 flex items-start gap-1 text-xs leading-relaxed text-slate-600">
-                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                    <p className="mt-1.5 flex items-start gap-1.5 text-xs font-medium leading-relaxed text-slate-600 lg:text-sm">
+                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400 lg:h-4 lg:w-4" aria-hidden />
                       {b.address}
                     </p>
                     {b.mapsUrl && (
@@ -269,9 +269,9 @@ function BranchesPage({
                         href={b.mapsUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-1.5 inline-flex items-center gap-1 text-xs font-extrabold text-blue-700 hover:underline"
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-extrabold text-blue-700 hover:underline lg:text-sm"
                       >
-                        <ExternalLink className="h-3.5 w-3.5" aria-hidden /> Buka Google Maps
+                        <ExternalLink className="h-3.5 w-3.5 lg:h-4 lg:w-4" aria-hidden /> Buka Google Maps
                       </a>
                     )}
                   </div>
@@ -279,7 +279,7 @@ function BranchesPage({
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-9 w-9 border-slate-300"
+                      className="h-9 w-9 rounded-lg border-slate-300 lg:h-10 lg:w-10"
                       onClick={() => openEdit(b)}
                       aria-label={`Edit cabang ${b.name}`}
                     >
@@ -288,7 +288,7 @@ function BranchesPage({
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-9 w-9 border-slate-300 hover:bg-red-50"
+                      className="h-9 w-9 rounded-lg border-slate-300 hover:bg-red-50 lg:h-10 lg:w-10"
                       onClick={() => setDeleteTarget(b)}
                       aria-label={`Hapus cabang ${b.name}`}
                     >
@@ -318,43 +318,43 @@ function BranchesPage({
 
           <form onSubmit={submit} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="b-name">Nama Cabang *</Label>
+              <Label htmlFor="b-name" className="font-semibold text-slate-700">Nama Cabang *</Label>
               <Input
                 id="b-name"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="cth: Cabang Bekasi"
-                className="h-11"
+                className="h-12 rounded-xl px-4 text-base md:text-base"
                 autoFocus
                 required
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="b-address">Alamat Lengkap *</Label>
+              <Label htmlFor="b-address" className="font-semibold text-slate-700">Alamat Lengkap *</Label>
               <Textarea
                 id="b-address"
                 value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
                 placeholder="cth: Jl. Raya Bekasi KM 18, Bekasi Selatan, Jawa Barat"
                 rows={2}
-                className="resize-none"
+                className="min-h-[120px] resize-none rounded-xl p-4 text-base md:text-base"
                 maxLength={200}
                 required
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="b-maps">Link Google Maps</Label>
+              <Label htmlFor="b-maps" className="font-semibold text-slate-700">Link Google Maps</Label>
               <Input
                 id="b-maps"
                 value={form.mapsUrl}
                 onChange={(e) => setForm((f) => ({ ...f, mapsUrl: e.target.value }))}
                 placeholder="https://maps.app.goo.gl/..."
-                className="h-11"
+                className="h-12 rounded-xl px-4 text-base md:text-base"
                 autoCapitalize="none"
                 autoCorrect="off"
                 inputMode="url"
               />
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 Marketing menekan tombol Maps di kartu unit untuk navigasi antar pembeli —
                 isi agar tidak salah alamat.
               </p>
@@ -363,7 +363,7 @@ function BranchesPage({
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 border-slate-300 font-bold"
+                className="h-12 rounded-xl border-slate-300 font-semibold"
                 onClick={() => setDialogOpen(false)}
               >
                 Batal
@@ -371,7 +371,7 @@ function BranchesPage({
               <Button
                 type="submit"
                 disabled={saving}
-                className="h-11 flex-1 bg-blue-700 text-sm font-extrabold hover:bg-blue-800"
+                className="h-12 flex-1 rounded-xl bg-blue-700 text-base font-extrabold hover:bg-blue-800"
               >
                 {saving ? 'Menyimpan...' : editing ? 'Simpan Perubahan' : 'Tambah Cabang'}
               </Button>
@@ -397,9 +397,9 @@ function BranchesPage({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10">Batal</AlertDialogCancel>
+            <AlertDialogCancel className="h-11 rounded-lg">Batal</AlertDialogCancel>
             <AlertDialogAction
-              className="h-10 bg-red-700 font-bold hover:bg-red-800"
+              className="h-11 rounded-lg bg-red-700 font-bold hover:bg-red-800"
               onClick={(e) => {
                 e.preventDefault()
                 confirmDelete()

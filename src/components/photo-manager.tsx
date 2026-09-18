@@ -17,6 +17,11 @@ interface PhotoManagerProps {
   hint?: string
   /** Tampilkan penanda & aksi "foto utama" (hanya relevan untuk foto unit). */
   withCover?: boolean
+  /**
+   * Mode logo: pratinjau persegi besar (w-28 h-28 rounded-2xl) + tombol
+   * "Ganti Logo" yang jelas — dipakai tab Pengaturan (logo showroom).
+   */
+  logoMode?: boolean
 }
 
 /**
@@ -30,6 +35,7 @@ export function PhotoManager({
   label = 'Foto',
   hint,
   withCover = true,
+  logoMode = false,
 }: PhotoManagerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -82,6 +88,66 @@ export function PhotoManager({
   }
 
   const canAdd = photos.length < maxPhotos && !uploading
+
+  // Mode logo: pratinjau persegi besar + tombol ganti/hapus yang mencolok.
+  if (logoMode) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-semibold text-slate-900">{label}</span>
+          {hint && <span className="text-[11px] text-slate-400">{hint}</span>}
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {photos.length > 0 ? (
+            <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
+              <VehiclePhoto
+                src={photos[0]}
+                alt="Logo"
+                sizes="112px"
+                className="h-full w-full object-contain"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-center text-xs font-bold text-slate-500 hover:border-blue-500 hover:text-blue-700"
+            >
+              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+              {uploading ? 'Mengunggah...' : 'Upload Logo'}
+            </button>
+          )}
+          <div className="flex flex-col items-start gap-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+              {photos.length > 0 ? 'Ganti Logo' : 'Pilih Logo'}
+            </button>
+            {photos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onChange(photos.filter((x) => x !== photos[0]))}
+                className="inline-flex h-9 items-center gap-1 rounded-lg px-3 text-sm font-bold text-red-600 hover:bg-red-50"
+              >
+                <X className="h-4 w-4" /> Hapus Logo
+              </button>
+            )}
+          </div>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          onChange={(e) => onFilesPicked(e.target.files)}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-1.5">
