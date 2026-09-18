@@ -867,3 +867,20 @@ Work Log:
 Stage Summary:
 - Semua materi iklan portal kini menutup dgn kontak rekanan aktif SAJA (WA pribadi + wa.me + link Toko Online personal + lokasi unit/showroom tanpa kontak) — cocok utk diposting marketing tanpa membocorkan nomor owner
 - Binding nomor reaktif: sumber tunggal info.phoneNumber/marketing.phone → Ganti Nomor langsung tercermin di template tanpa cache
+---
+Task ID: portal-ui-scale-up
+Agent: main (Z.ai Code)
+Task: Restrukturisasi visual menyeluruh (UI Scale Up) Portal Kerja Marketing — kolom, tombol, kartu, teks proporsional di layar HP
+
+Work Log:
+- Header portal: h1 text-sm->text-lg font-bold, sub text-xs->text-sm, min-h-16, logo 11 rounded-lg; tombol Ganti Nomor h-9 text-xs bold -> h-10 px-3.5 text-sm font-medium rounded-lg
+- Kartu Toko Online Saya: p-4 rounded-lg -> p-5 rounded-xl; h2 -> text-base font-bold; deskripsi text-xs->text-sm; box URL (p mono text-[11px] py-1.5) -> h-12 flex items-center px-4 text-sm font-medium rounded-lg; tombol Salin Link Toko/Buka Toko Saya -> FULL-WIDTH grid-cols-1 sm:grid-cols-2 gap-2.5, h-12 w-full rounded-lg text-sm font-bold, ikon size-5; badge kode MKT px-1.5 text-[10px] -> px-3 py-1 text-xs font-bold rounded-md
+- Kartu unit: p-3 rounded-lg -> p-4 rounded-xl; foto aspect-4/3 w-28 -> SQUARE h-28 w-28 sm:h-32 sm:w-32 rounded-lg, badge jumlah foto text-[9px]->text-xs px-1.5 rounded-md; judul text-sm truncate -> line-clamp-2 text-base sm:text-lg font-bold leading-snug; meta text-xs truncate -> text-sm font-medium (wrap, tanpa potong info); harga text-base->text-lg font-extrabold; komisi teks emerald polos -> BADGE kotak bg-emerald-50 ring-emerald-200 px-2 py-1 text-sm font-bold text-emerald-600; badge status via StatusBadge className="px-2.5 py-1 text-xs" (cn/tw-merge, default 10px KATALOG TIDAK BERUBAH — diverifikasi: katalog tetap fs 10px px 6px); banner hold -> badge amber kotak text-xs
+- Tombol aksi kartu: grid gap-2 -> gap-2.5; semua h-10 text-xs -> h-11 (44px) text-sm font-semibold, ikon size-4 eksplisit; urutan & pemisah border-t pt-3 mt-3 tetap; unit terjual Lihat Detail h-11 text-sm
+- Teks kecil lain: sinkron-otomatis text-[11px]->text-xs, footer note text-[11px]->text-sm, tombol Coba Lagi text-xs->text-sm
+- Poin 4 (generator teks iklan) SUDAH selesai task sebelumnya (commit 2e3fcce) — diverifikasi ulang: Salin Iklan tetap 4 baris penutup kontak marketing (0812-9931-2210 / wa.me/6281299312210 / ?ref=MKT-PGTSUG / lokasi Cabang Depok), 0 nomor owner, 0 nama marketing
+- E2E agent-browser 390px: hScroll false; tombol aksi 44px x 157px clip:false semua; judul 16px; harga 18px; link box 48px; tombol toko full-width 316x48; badge 12px/10px; 900px: 4 tombol aksi 1 baris, 2 tombol toko 1 baris, hScroll false; katalog publik tidak berubah (badge default); 0 error console; lint + tsc src/ bersih
+
+Stage Summary:
+- Portal Kerja kini "UI Scale Up" penuh: semua target sentuh >=44px, teks konten >=14px (badge/metadata text-xs sesuai spec user), kartu rounded-xl dgn shadow lembut, tanpa teks terpotong di 390px maupun 900px
+- StatusBadge kini reusable 2 ukuran via cn (default katalog kecil, portal md) tanpa duplikasi komponen

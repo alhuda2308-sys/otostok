@@ -294,19 +294,19 @@ export function PartnerClient({
     <>
       {/* Header portal */}
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex min-h-14 w-full max-w-3xl items-center gap-3 px-4 py-2">
+        <div className="mx-auto flex min-h-16 w-full max-w-3xl items-center gap-3 px-4 py-2.5">
           {showroom?.logoUrl && (
             <img
               src={showroom.logoUrl}
               alt={`Logo ${showroom.name}`}
-              className="h-10 w-10 shrink-0 rounded-md object-cover ring-1 ring-slate-200"
+              className="h-11 w-11 shrink-0 rounded-lg object-cover ring-1 ring-slate-200"
             />
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-extrabold text-slate-900">
+            <h1 className="truncate text-lg font-bold leading-tight text-slate-900">
               Portal Kerja Marketing
             </h1>
-            <p className="truncate text-xs text-slate-500">
+            <p className="mt-0.5 truncate text-sm text-slate-500">
               {showroom?.name ?? showroomName ?? 'Memuat...'}
               {name ? ` • ${name}` : ''}
               {info?.addressCity ? ` (${info.addressCity})` : ''}
@@ -314,8 +314,7 @@ export function PartnerClient({
           </div>
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 shrink-0 border-slate-300 text-xs font-bold"
+            className="h-10 shrink-0 rounded-lg border-slate-300 px-3.5 text-sm font-medium"
             onClick={handleChangeNumber}
           >
             Ganti Nomor
@@ -329,7 +328,7 @@ export function PartnerClient({
             <p className="text-sm font-bold text-red-800">{error}</p>
             <Button
               variant="outline"
-              className="mt-3 h-10 border-red-300 text-xs font-bold"
+              className="mt-3 h-10 border-red-300 text-sm font-medium"
               onClick={() => refetch()}
             >
               Coba Lagi
@@ -339,40 +338,40 @@ export function PartnerClient({
 
         {/* Kartu TOKO ONLINE SAYA — link toko personal rekanan */}
         {info && (
-          <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-            <h2 className="flex flex-wrap items-center gap-1.5 text-sm font-extrabold text-emerald-900">
-              <Store className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
+          <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+            <h2 className="flex flex-wrap items-center gap-2 text-base font-bold text-emerald-900">
+              <Store className="h-5 w-5 shrink-0 text-emerald-700" aria-hidden />
               Toko Online Saya
-              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
+              <span className="rounded-md bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
                 {info.code ?? 'KODE DALAM PROSES'}
               </span>
             </h2>
-            <p className="mt-1 text-xs leading-relaxed text-emerald-900">
+            <p className="mt-2 text-sm leading-relaxed text-emerald-900">
               Bagikan link ini ke calon pembeli — katalog terbuka dengan nama Anda sebagai
               Mitra Penjualan Resmi dan seluruh tombol chat WhatsApp pembeli masuk ke nomor
               Anda.
             </p>
             <p
               dir="ltr"
-              className="mt-2 truncate rounded-md border border-emerald-200 bg-white px-2.5 py-1.5 font-mono text-[11px] text-emerald-900"
+              className="mt-3 flex h-12 items-center truncate rounded-lg border border-emerald-200 bg-white px-4 text-sm font-medium text-emerald-900"
               title={storeLink()}
             >
               {storeLink()}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <Button
-                className="h-10 bg-emerald-700 px-3 text-xs font-extrabold hover:bg-emerald-800"
+                className="h-12 w-full rounded-lg bg-emerald-700 text-sm font-bold hover:bg-emerald-800"
                 onClick={handleCopyStoreLink}
               >
-                <Copy className="mr-1 h-3.5 w-3.5" /> Salin Link Toko
+                <Copy className="size-5" /> Salin Link Toko
               </Button>
               <Button
                 variant="outline"
                 asChild
-                className="h-10 border-emerald-300 bg-white px-3 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100"
+                className="h-12 w-full rounded-lg border-emerald-300 bg-white text-sm font-bold text-emerald-800 hover:bg-emerald-100"
               >
                 <a href={storeLink()} target="_blank" rel="noreferrer">
-                  <ExternalLink className="mr-1 h-3.5 w-3.5" /> Buka Toko Saya
+                  <ExternalLink className="size-5" /> Buka Toko Saya
                 </a>
               </Button>
             </div>
@@ -380,14 +379,14 @@ export function PartnerClient({
         )}
 
         {/* Daftar unit + alat kerja */}
-        <section className="space-y-2.5">
+        <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-extrabold text-slate-900">
+            <h2 className="text-base font-bold text-slate-900">
               Stok Unit &amp; Alat Kerja
               {data ? ` (${data.vehicles.length})` : ''}
             </h2>
             {data && (
-              <span className="text-[11px] text-slate-400">Sinkron otomatis tiap 30 detik</span>
+              <span className="text-xs text-slate-400">Sinkron otomatis tiap 30 detik</span>
             )}
           </div>
 
@@ -418,7 +417,7 @@ export function PartnerClient({
           ))}
         </section>
 
-        <p className="pb-4 text-center text-[11px] leading-relaxed text-slate-400">
+        <p className="pb-4 text-center text-sm leading-relaxed text-slate-400">
           Katalog pembeli bersih dari alat kerja — pembeli hanya melihat foto, spesifikasi,
           dan tombol chat WhatsApp.
         </p>
@@ -506,15 +505,15 @@ function PartnerVehicleCard({
   }
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      {/* ===== BAGIAN ATAS — foto kiri, info kanan (tanpa tombol) ===== */}
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {/* ===== BAGIAN ATAS — foto kiri (persegi), info kanan (tanpa tombol) ===== */}
       <div className="flex gap-3">
         {/* Foto unit — klik membuka Modal Detail Unit */}
         <button
           type="button"
           onClick={onOpenDetail}
           aria-label={`Lihat detail ${v.brand} ${v.model}`}
-          className="relative aspect-[4/3] w-28 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 transition-opacity hover:opacity-90 sm:w-36"
+          className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 transition-opacity hover:opacity-90 sm:h-32 sm:w-32"
         >
           {v.photos[0] ? (
             <img
@@ -528,8 +527,8 @@ function PartnerVehicleCard({
             </span>
           )}
           {v.photos.length > 1 && (
-            <span className="absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded bg-slate-900/70 px-1 py-0.5 text-[9px] font-bold text-white">
-              <Camera className="h-2.5 w-2.5" aria-hidden /> {v.photos.length}
+            <span className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-slate-900/75 px-1.5 py-0.5 text-xs font-bold text-white">
+              <Camera className="h-3 w-3" aria-hidden /> {v.photos.length}
             </span>
           )}
         </button>
@@ -538,32 +537,32 @@ function PartnerVehicleCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-sm font-extrabold text-slate-900">
+              <h3 className="line-clamp-2 text-base font-bold leading-snug text-slate-900 sm:text-lg">
                 {v.brand} {v.model}
               </h3>
-              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+              <p className="mt-1 text-sm font-medium leading-snug text-slate-500">
                 {v.year} • {v.licensePlate}
                 {v.odometer != null ? ` • ${formatKm(v.odometer)}` : ''}
                 {v.branch ? ` • ${v.branch.name}` : ''}
               </p>
             </div>
-            <StatusBadge status={v.status} />
+            <StatusBadge status={v.status} className="shrink-0 px-2.5 py-1 text-xs" />
           </div>
 
-          {/* Harga + komisi — flex-wrap agar komisi pindah baris UTUH (angka tak terpotong) */}
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <p className="text-base font-extrabold tracking-tight text-slate-900">
+          {/* Harga + komisi — flex-wrap agar badge komisi pindah baris UTUH (angka tak terpotong) */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <p className="text-lg font-extrabold tracking-tight text-slate-900">
               {formatRupiah(v.sellingPrice)}
             </p>
             {v.commissionAmount != null && !isSold && (
-              <p className="text-xs font-extrabold text-emerald-700">
+              <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-sm font-bold text-emerald-600 ring-1 ring-emerald-200">
                 Komisi {formatRupiah(v.commissionAmount)}
-              </p>
+              </span>
             )}
           </div>
 
           {isHeld && v.activeHold && (
-            <p className="mt-1 text-[11px] font-bold leading-tight text-amber-800">
+            <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">
               Ditahan oleh {v.activeHold.marketingName} •{' '}
               <Countdown
                 expiresAt={v.activeHold.expiresAt}
@@ -578,44 +577,44 @@ function PartnerVehicleCard({
       {/* ===== BAGIAN BAWAH — tombol aksi LEBAR PENUH di bawah foto+info ===== */}
       {!isSold && (
         <div className="mt-3 border-t border-slate-100 pt-3">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {/* Baris 1 mobile: Tahan Unit | Lihat Detail — primer solid utk aksi utama */}
             <Button
-              className="h-10 min-h-[40px] bg-blue-700 px-3 text-xs font-semibold hover:bg-blue-800"
+              className="h-11 bg-blue-700 px-3 text-sm font-semibold hover:bg-blue-800"
               disabled={isHeld}
               onClick={onHold}
               title={isHeld ? 'Unit sedang ditahan' : 'Kunci unit 2 jam atas nama Anda'}
             >
-              <Lock aria-hidden />
+              <Lock className="size-4" aria-hidden />
               {isHeld ? 'Ditahan' : 'Tahan Unit'}
             </Button>
             <Button
               variant="outline"
-              className="h-10 min-h-[40px] border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              className="h-11 border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
               onClick={onOpenDetail}
             >
-              <Info aria-hidden />
+              <Info className="size-4" aria-hidden />
               Lihat Detail
             </Button>
             {/* Baris 2 mobile: Salin Iklan | Materi Iklan — secondary outline bersih */}
             <Button
               variant="outline"
-              className="h-10 min-h-[40px] border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              className="h-11 border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
               onClick={onCopyAd}
             >
-              <ClipboardCopy aria-hidden />
+              <ClipboardCopy className="size-4" aria-hidden />
               Salin Iklan
             </Button>
             <Button
               variant="outline"
-              className="h-10 min-h-[40px] border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              className="h-11 border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
               onClick={handleShare}
               disabled={sharing}
             >
               {sharing ? (
-                <Loader2 className="animate-spin" aria-hidden />
+                <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (
-                <Share2 aria-hidden />
+                <Share2 className="size-4" aria-hidden />
               )}
               Materi Iklan
             </Button>
@@ -626,10 +625,10 @@ function PartnerVehicleCard({
         <div className="mt-3 border-t border-slate-100 pt-3">
           <Button
             variant="outline"
-            className="h-10 min-h-[40px] w-full border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            className="h-11 w-full border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
             onClick={onOpenDetail}
           >
-            <Info aria-hidden />
+            <Info className="size-4" aria-hidden />
             Lihat Detail
           </Button>
         </div>
