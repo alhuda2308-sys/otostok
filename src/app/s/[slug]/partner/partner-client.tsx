@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   Bike,
@@ -8,6 +8,7 @@ import {
   ClipboardCopy,
   Copy,
   ExternalLink,
+  Info,
   Loader2,
   Lock,
   Share2,
@@ -16,7 +17,9 @@ import {
 import { Countdown } from '@/components/countdown'
 import { HoldDialog } from '@/components/hold-dialog'
 import { MarketingGate } from '@/components/marketing-gate'
+import { PhotoLightbox } from '@/components/photo-lightbox'
 import { StatusBadge } from '@/components/status-badge'
+import { VehicleDetailModal } from '@/components/vehicle-detail-modal'
 import { Button } from '@/components/ui/button'
 import {
   buildAdText,
@@ -70,6 +73,15 @@ export function PartnerClient({
   const [error, setError] = useState<string | null>(null)
   const [holdTarget, setHoldTarget] = useState<PublicVehicle | null>(null)
   const [origin, setOrigin] = useState('')
+
+  /** Modal Detail Unit — ID di state, objek unit DIDERIVASI dari data terbaru
+   *  (tanpa fetch API: modal terbuka instan dari stok yang sudah dimuat). */
+  const [detailId, setDetailId] = useState<string | null>(null)
+  /** true = modal memutar animasi keluar (data unit dilepas setelah selesai ±320ms). */
+  const [detailClosing, setDetailClosing] = useState(false)
+  const detailCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Galeri layar penuh dari dalam modal (z-[70] di atas modal z-[60]). */
+  const [gallery, setGallery] = useState<{ vehicle: PublicVehicle; index: number } | null>(null)
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -181,8 +193,60 @@ export function PartnerClient({
     else toast.error('Gagal menyalin. Coba lagi.')
   }
 
+  /** Buka modal detail — batalkan animasi keluar yang masih berjalan (bila ada). */
+  function openDetail(id: string) {
+    if (detailCloseTimer.current) {
+      clearTimeout(detailCloseTimer.current)
+      detailCloseTimer.current = null
+    }
+    setDetailClosing(false)
+    setDetailId(id)
+  }
+
+  /** Tutup modal — tunggu animasi keluar (±320ms) selesai baru lepas data unit. */
+  function closeDetail() {
+    setDetailClosing(true)
+    detailCloseTimer.current = setTimeout(() => {
+      setDetailId(null)
+      setDetailClosing(false)
+      detailCloseTimer.current = null
+    }, 320)
+  }
+
+  // Bersihkan timer tutup-modal saat portal unmount
+  useEffect(() => {
+    return () => {
+      if (detailCloseTimer.current) clearTimeout(detailCloseTimer.current)
+    }
+  }, [])
+
+  /** "Tahan Unit Ini" dari dalam modal — tutup modal dulu, HoldDialog menyusul
+   *  setelah animasi keluar selesai (hindari tumpukan dialog). */
+  function handleHoldFromModal() {
+    const v = data?.vehicles.find((x) => x.id === detailId) ?? null
+    if (!v || v.status !== 'available') return
+    closeDetail()
+    const t = setTimeout(() => setHoldTarget(v), 330)
+    // HoldDialog terbuka setelah modal tertutup — timer tak perlu dibatalkan
+    void t
+  }
+
+  /** Salin info lengkap unit dari dalam modal utk dipaste ke chat calon pembeli. */
+  async function handleCopyInfo(v: PublicVehicle) {
+    if (!data) return
+    const ok = await copyToClipboard(buildAdText(v, data.showroom))
+    if (ok) toast.success('Info lengkap unit disalin — paste ke chat calon pembeli.')
+    else toast.error('Gagal menyalin. Coba lagi.')
+  }
+
   const name = info?.fullName ?? marketing?.fullName ?? ''
   const showroom = data?.showroom
+
+  /** Unit utk modal detail — diambil dari data TERBARU (modal ikut segar saat auto-refresh). */
+  const detailTarget = useMemo(
+    () => data?.vehicles.find((v) => v.id === detailId) ?? null,
+    [data, detailId],
+  )
 
   // ============ Gerbang verifikasi nomor WhatsApp rekanan ============
   if (phase === 'gate') {
@@ -326,6 +390,7 @@ export function PartnerClient({
               showroom={data.showroom}
               onHold={() => setHoldTarget(v)}
               onCopyAd={() => handleCopyAd(v)}
+              onOpenDetail={() => openDetail(v.id)}
               onHoldExpired={() => refetch(true)}
             />
           ))}
@@ -345,6 +410,34 @@ export function PartnerClient({
         onSuccess={() => refetch(true)}
         session={marketing}
       />
+
+      {/* Galeri foto layar penuh — dibuka dari dalam modal detail (z-[70] > z-[60]) */}
+      <PhotoLightbox
+        open={gallery != null}
+        vehicle={gallery?.vehicle ?? null}
+        index={gallery?.index ?? 0}
+        onIndexChange={(i) => setGallery((g) => (g ? { ...g, index: i } : g))}
+        onClose={() => setGallery(null)}
+      />
+
+      {/* Modal Detail Unit — data dari state client (instan, tanpa fetch).
+          MODE MARKETING: CTA WA diganti "Salin Info Lengkap" + "Tahan Unit Ini";
+          hold dari modal menutup modal dulu, lalu HoldDialog terbuka. */}
+      {detailTarget && (
+        <VehicleDetailModal
+          vehicle={detailTarget}
+          open={!detailClosing}
+          waContact={null}
+          marketingMode
+          showLocation={(data?.branches.length ?? 0) > 0}
+          suspendEscape={gallery != null}
+          onClose={closeDetail}
+          onHoldExpired={() => refetch(true)}
+          onOpenLightbox={(i) => setGallery({ vehicle: detailTarget, index: i })}
+          onCopyInfo={() => handleCopyInfo(detailTarget)}
+          onHold={detailTarget.status === 'available' ? handleHoldFromModal : undefined}
+        />
+      )}
     </>
   )
 }
@@ -355,12 +448,15 @@ function PartnerVehicleCard({
   showroom,
   onHold,
   onCopyAd,
+  onOpenDetail,
   onHoldExpired,
 }: {
   v: PublicVehicle
   showroom: { name: string; address: string; ownerPhone: string }
   onHold: () => void
   onCopyAd: () => void
+  /** Buka Modal Detail Unit (dari tombol Lihat Detail / klik foto). */
+  onOpenDetail: () => void
   onHoldExpired: () => void
 }) {
   const [sharing, setSharing] = useState(false)
@@ -388,8 +484,13 @@ function PartnerVehicleCard({
 
   return (
     <article className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      {/* Foto kecil */}
-      <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-md bg-slate-100">
+      {/* Foto kecil — klik membuka Modal Detail Unit */}
+      <button
+        type="button"
+        onClick={onOpenDetail}
+        aria-label={`Lihat detail ${v.brand} ${v.model}`}
+        className="relative h-20 w-28 shrink-0 overflow-hidden rounded-md bg-slate-100 transition-opacity hover:opacity-90"
+      >
         {v.photos[0] ? (
           <img
             src={v.photos[0]}
@@ -397,11 +498,16 @@ function PartnerVehicleCard({
             className={`h-full w-full object-cover ${isSold ? 'opacity-60' : ''}`}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
+          <span className="flex h-full w-full items-center justify-center">
             <Camera className="h-6 w-6 text-slate-300" aria-hidden />
-          </div>
+          </span>
         )}
-      </div>
+        {v.photos.length > 1 && (
+          <span className="absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded bg-slate-900/70 px-1 py-0.5 text-[9px] font-bold text-white">
+            <Camera className="h-2.5 w-2.5" aria-hidden /> {v.photos.length}
+          </span>
+        )}
+      </button>
 
       {/* Info + alat kerja */}
       <div className="min-w-0 flex-1">
@@ -439,9 +545,9 @@ function PartnerVehicleCard({
           </p>
         )}
 
-        {/* Alat kerja — dipindah dari katalog publik */}
+        {/* Alat kerja — dipindah dari katalog publik + Lihat Detail (modal) */}
         {!isSold && (
-          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             <Button
               className="h-9 bg-blue-700 px-2 text-[11px] font-extrabold hover:bg-blue-800"
               disabled={isHeld}
@@ -466,13 +572,31 @@ function PartnerVehicleCard({
             </Button>
             <Button
               variant="outline"
-              className="col-span-2 h-9 border-slate-300 bg-white px-2 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50 sm:col-span-1"
+              className="h-9 border-slate-300 bg-white px-2 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
               onClick={onCopyAd}
             >
               <ClipboardCopy className="mr-1 h-3.5 w-3.5" />
-              Salin Teks Promosi
+              Salin Iklan
+            </Button>
+            <Button
+              variant="outline"
+              className="h-9 border-slate-300 bg-white px-2 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
+              onClick={onOpenDetail}
+            >
+              <Info className="mr-1 h-3.5 w-3.5" />
+              Lihat Detail
             </Button>
           </div>
+        )}
+        {isSold && (
+          <Button
+            variant="outline"
+            className="mt-2 h-9 w-full border-slate-300 bg-white px-2 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
+            onClick={onOpenDetail}
+          >
+            <Info className="mr-1 h-3.5 w-3.5" />
+            Lihat Detail
+          </Button>
         )}
       </div>
     </article>

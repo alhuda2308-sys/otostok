@@ -5,9 +5,11 @@ import {
   Bike,
   ChevronLeft,
   ChevronRight,
+  ClipboardCopy,
   Cog,
   FileCheck2,
   Hash,
+  Lock,
   MapPin,
   Maximize2,
   MessageCircle,
@@ -62,6 +64,9 @@ export function VehicleDetailModal({
   waContact,
   showLocation,
   suspendEscape = false,
+  marketingMode = false,
+  onCopyInfo,
+  onHold,
   onClose,
   onHoldExpired,
   onOpenLightbox,
@@ -82,6 +87,16 @@ export function VehicleDetailModal({
   /** True saat lightbox layar penuh terbuka di atas modal → listener ESC modal dilepas
    *  (bukan sekadar di-skip saat event) supaya tidak ada ambiguitas urutan listener window. */
   suspendEscape?: boolean
+  /**
+   * MODE MARKETING (Portal Kerja): CTA WA pembeli diganti alat kerja —
+   * "Salin Info Lengkap" + "Tahan Unit Ini" (unit tersedia).
+   */
+  marketingMode?: boolean
+  /** MODE MARKETING: salin info lengkap unit utk dipaste ke chat calon pembeli. */
+  onCopyInfo?: () => void
+  /** MODE MARKETING: tahan unit ini dari dalam modal — hanya dirender bila disediakan
+   *  (parent hanya mengirimkannya saat unit tersedia). */
+  onHold?: () => void
   onClose: () => void
   /** Countdown hold di banner habis → parent segarkan data (unit kembali Ready). */
   onHoldExpired?: () => void
@@ -322,8 +337,38 @@ export function VehicleDetailModal({
         <div className="shrink-0 border-t border-slate-200 bg-white px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
           {isSold ? (
             <p className="py-1 text-center text-xs font-bold text-slate-500">
-              Unit ini sudah terjual — lihat unit lain di katalog.
+              {marketingMode
+                ? 'Unit ini sudah terjual.'
+                : 'Unit ini sudah terjual — lihat unit lain di katalog.'}
             </p>
+          ) : marketingMode ? (
+            /* MODE MARKETING: alat kerja menggantikan CTA WA pembeli */
+            <div className="grid grid-cols-2 gap-2">
+              {onCopyInfo && (
+                <button
+                  type="button"
+                  onClick={onCopyInfo}
+                  className="flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white text-sm font-extrabold text-slate-800 shadow-sm transition-colors hover:bg-slate-50"
+                >
+                  <ClipboardCopy className="h-5 w-5" aria-hidden />
+                  Salin Info Lengkap
+                </button>
+              )}
+              {onHold ? (
+                <button
+                  type="button"
+                  onClick={onHold}
+                  className="flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-700 text-sm font-extrabold text-white shadow-sm transition-colors hover:bg-blue-800"
+                >
+                  <Lock className="h-5 w-5" aria-hidden />
+                  Tahan Unit Ini
+                </button>
+              ) : (
+                <p className="flex h-12 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-2 text-center text-[11px] font-bold leading-tight text-amber-800">
+                  Unit sedang ditahan
+                </p>
+              )}
+            </div>
           ) : waHref ? (
             <a
               href={waHref}

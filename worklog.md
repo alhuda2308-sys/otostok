@@ -818,3 +818,19 @@ Stage Summary:
 - Pemisahan hak akses tegas: KATALOG PUBLIK = pembeli (WA routing owner/mitra via ?ref, tanpa alat kerja, tanpa komisi) vs PORTAL KERJA = marketing (verifikasi WA, alat hold/iklan, kartu Toko Online Saya)
 - Owner dashboard kini membuka katalog dgn mode bersih terjamin (?owner=1 membersihkan atribusi tersimpan di browser) & menyalin URL murni /s/[slug]
 - Keamanan portal: identitas hanya dari sesi verifikasi WA — link toko publik (?ref) TIDAK bisa membuka alat operasional marketing
+
+---
+Task ID: portal-lihat-detail-modal
+Agent: main (Z.ai Code)
+Task: Tambah "Lihat Detail" (Popup Detail Unit) di Portal Kerja Marketing + CTA modal khusus marketing
+
+Work Log:
+- VehicleDetailModal diperluas props opsional marketingMode/onCopyInfo/onHold: mode marketing mengganti CTA WA pembeli dgn 2 tombol — "Salin Info Lengkap" (outline, ClipboardCopy) + "Tahan Unit Ini" (biru, Lock; bila unit ditahan → catatan amber "Unit sedang ditahan"); unit terjual → pesan singkat; katalog publik TIDAK berubah (regresi dicek: WA CTA tetap tampil)
+- partner-client: state detailId/detailClosing/timer + detailTarget useMemo (modal derive data terbaru, TANPA fetch — diverifikasi stub fetch: 0 panggilan saat buka modal) + gallery utk PhotoLightbox (z-[70] di atas modal z-[60]); tombol "Lihat Detail" di kartu (grid 2x2 mobile / 4 kolom sm: Tahan Unit, Materi Iklan, Salin Iklan [label dipersingkat], Lihat Detail) + foto kartu clickable (badge jumlah foto); unit terjual punya tombol Lihat Detail
+- "Salin Info Lengkap" = buildAdText (DIJUAL — spek | pajak | surat | harga | showroom) → clipboard dgn toast; "Tahan Unit Ini" menutup modal dulu (330ms animasi keluar) lalu HoldDialog terbuka (hindari tumpukan dialog z)
+- E2E agent-browser: kartu portal 4 tombol; modal unit ditahan → Salin Info Lengkap saja + tanpa Tahan; modal unit READY → kedua tombol; salin = teks iklan lengkap (DIJUAL — Yamaha Lexi... Plat/KM/Warna/Pajak/Surat/Harga/Showroom ✓); Tahan Unit Ini → modal tutup → HoldDialog "Konfirmasi Tahan Unit — Yamaha Mio Sporty" → konfirmasi → toast sukses + kartu "Ditahan oleh Deni Prasetyo"; klik foto → lightbox z-70; ESC-1 tutup lightbox SAJA (modal tetap), ESC-2 tutup modal; mobile 390px bottom sheet penuh rounded-t, desktop 1280px center modal 672px; 0 fetch API saat buka modal; katalog publik regresi aman; 0 error console
+- Lint bersih; tsc 0 error di src/
+
+Stage Summary:
+- Portal Kerja kini punya popup detail unit penuh (galeri swipe/thumbnail, spesifikasi, deskripsi, status, simulasi angsuran) dgn alat khusus marketing di bar aksi: Salin Info Lengkap + Tahan Unit Ini
+- Satu komponen modal dipakai dua konteks: katalog publik (CTA WA pembeli) vs portal (alat kerja marketing) — dipilah lewat props opsional, tanpa duplikasi
