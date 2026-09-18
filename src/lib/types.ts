@@ -73,6 +73,23 @@ export interface MarketingSession {
   phone: string
 }
 
+/**
+ * Atribusi referral Personal Store (Katalog Digital Multi-Mitra).
+ * Dibuat saat visitor membuka /s/[slug]?ref=<kode> atau ?mkt=<id> yang valid,
+ * lalu disimpan di localStorage per showroom (kunci otostok_ref_<slug>) agar
+ * atribusi tetap menempel pada kunjungan berikutnya.
+ * Efek: semua tombol WhatsApp (header, kartu, modal detail) mengarah ke nomor
+ * marketing ini, bukan nomor resmi showroom.
+ */
+export interface ReferralSession {
+  id: string
+  fullName: string
+  /** Format internasional 62xxx — tujuan WA sekaligus kredensial X-Mkt-Phone. */
+  phone: string
+  /** Kode referral MKT-XXXXXX bila tersedia (null = link toko via ?mkt=<id>). */
+  code: string | null
+}
+
 /** Rekanan marketing di dashboard owner. */
 export interface MarketingPartner {
   id: string
@@ -80,6 +97,8 @@ export interface MarketingPartner {
   /** Format lokal 08xxx untuk tampilan. */
   phoneNumber: string
   addressCity: string
+  /** Kode referral Personal Store (MKT-XXXXXX) — parameter ?ref= link toko. */
+  code: string | null
   notes: string | null
   isActive: boolean
   createdAt: string

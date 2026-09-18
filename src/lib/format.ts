@@ -65,17 +65,50 @@ export function waLink(phone: string, text?: string): string {
 }
 
 /**
- * Template pesan WA "tanya unit ini" — dipakai tombol Chat WhatsApp di kartu
- * katalog & tombol utama di Modal Detail Unit (format konsisten utk owner).
+ * Kode unit (brand/model/tahun) untuk template WA — dipakai kartu & modal.
  */
-export function buildUnitInquiryText(v: {
+interface UnitInquiryVehicle {
   brand: string
   model: string
   year: number
-  sellingPrice: number | null
-}): string {
-  const harga = v.sellingPrice != null ? ` seharga ${formatRupiah(v.sellingPrice)}` : ''
-  return `Halo, saya tertarik dengan unit ${v.brand} ${v.model} ${v.year}${harga} di katalog MotoStock. Apakah unit ini masih tersedia?`
+}
+
+interface InquiryContext {
+  /** Nama showroom (selalu tampil di kedua template). */
+  showroomName: string
+  /** Terisi = mode Personal Store (referral marketing aktif) → template mitra. */
+  marketingName?: string | null
+}
+
+/**
+ * Template pesan WA "tanya unit ini" — dipakai tombol Chat WhatsApp di kartu
+ * katalog & tombol utama di Modal Detail Unit.
+ *
+ * - Mode Marketing (?ref/?mkt valid): "Halo <Nama Marketing>, saya tertarik dengan
+ *   unit <Motor> <Tahun> di katalog Anda (Showroom <Nama Showroom>). Apakah unit ini masih ada?"
+ * - Mode Owner (direct): "Halo <Nama Showroom>, saya tertarik dengan unit <Motor> <Tahun>
+ *   di katalog resmi MotoStock Anda. Apakah unit ini masih ada?"
+ */
+export function buildUnitInquiryText(
+  v: UnitInquiryVehicle,
+  ctx: InquiryContext,
+): string {
+  if (ctx.marketingName) {
+    return `Halo ${ctx.marketingName}, saya tertarik dengan unit ${v.brand} ${v.model} ${v.year} di katalog Anda (Showroom ${ctx.showroomName}). Apakah unit ini masih ada?`
+  }
+  return `Halo ${ctx.showroomName}, saya tertarik dengan unit ${v.brand} ${v.model} ${v.year} di katalog resmi MotoStock Anda. Apakah unit ini masih ada?`
+}
+
+/**
+ * Template pesan WA umum (bukan per-unit) untuk tombol chat di header katalog.
+ * - Mode Marketing: sapa mitra + minta info unit yang tersedia.
+ * - Mode Owner: teks sapaan resmi yang sudah ada.
+ */
+export function buildCatalogGreetingText(ctx: InquiryContext): string {
+  if (ctx.marketingName) {
+    return `Halo ${ctx.marketingName}, saya melihat katalog (Showroom ${ctx.showroomName}). Bisa dibantu info unit yang tersedia?`
+  }
+  return `Halo ${ctx.showroomName}, saya lihat katalog MotoStock Anda. Ada unit yang menarik.`
 }
 
 /** Pajak dianggap "hidup" kalau teksnya tidak mengandung kata "mati". */

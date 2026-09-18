@@ -736,3 +736,30 @@ Stage Summary:
 - Kartu katalog kini punya CTA konversi pembeli (Chat WhatsApp spesifik unit + Lihat Detail) berdampingan dgn alat marketing (Bagikan/Salin/Tahan)
 - Modal detail instan (data dari state client, tanpa fetch) dgn galeri interaktif, simulasi angsuran, spesifikasi lengkap & CTA WA ter-template — bottom sheet di HP, center modal di desktop, animasi halus dua arah
 - Urutan layer: modal z-[60] di atas konten, PhotoLightbox z-[70] di atas modal; ESC menutup satu lapis per tekan
+
+---
+Task ID: katalog-multi-mitra-personal-store
+Agent: main (Z.ai Code)
+Task: Fitur "Katalog Digital Terintegrasi Multi-Mitra (Owner & Marketing Personal Store)" — routing referral ?ref/?mkt, WA dinamis, badge mitra, dashboard link toko + push main
+
+Work Log:
+- Schema (schema.prisma + schema.postgres.prisma): Marketing.code String? @unique (kode referral MKT-XXXXXX, charset tanpa I/O/0/1 via generateMarketingCode() di lib/super-auth.ts) — db:push sukses
+- src/lib/marketing-code.ts BARU: uniqueMarketingCode() (cek unik global maks 10 percobaan + fallback time-based)
+- src/lib/referral.ts BARU (client): load/save/clear sesi referral di localStorage kunci otostok_ref_<slug> (kunci BARU — identifier lama otostok_mkt_* tidak disentuh), readReferralParam() baca ?ref=/?mkt= dari window.location.search, resolveReferral() panggil API validasi
+- src/lib/types.ts: interface ReferralSession {id, fullName, phone 62xxx, code} + MarketingPartner.code
+- src/lib/format.ts: buildUnitInquiryText(v, ctx) dirombak — template persis spec: mitra "Halo <Marketing>, saya tertarik dengan unit <Motor> <Tahun> di katalog Anda (Showroom <Nama>). Apakah unit ini masih ada?" / owner "Halo <Showroom>, saya tertarik dengan unit <Motor> <Tahun> di katalog resmi MotoStock Anda. Apakah unit ini masih ada?"; buildCatalogGreetingText() BARU utk tombol chat header
+- API BARU GET /api/showrooms/[slug]/resolve-ref: validasi ?ref= (by code) / ?mkt= (by id), hanya rekanan AKTIF, 200 {registered, marketing{id,fullName,addressCity,phoneNumber,code}} / 404 — respons tanpa cache (no-store)
+- API admin marketings: GET select code + lazy backfill kode utk rekanan lama (idempoten); POST generate kode saat rekanan baru dibuat
+- catalog-client.tsx: state referral + referralRef; mount effect resolusi referral dulu (param valid → simpan; invalid → fallback sesi tersimpan) BARU LALU refetch — kredensial X-Mkt-Phone = sesi gate ?? referral (link toko membuka katalog whitelist tanpa gate); refetch dgn kredensial referral; badge banner emerald "Mitra Penjualan Resmi: <Nama> • Siap Melayani Pembelian & Cek Unit" + tombol Tutup (hapus atribusi → toast; showroom whitelist balik ke gerbang); tombol chat header dinamis (label "Chat <NamaDepan>"); CatalogCard props baru waPhone+marketingName (unitWaHref dinamis); VehicleDetailModal prop showroom→waContact {name, phone, marketingName}
+- vehicle-detail-modal.tsx: prop waContact — CTA "Tanya Unit Ini via WhatsApp" ikut routing mitra/owner dgn template yg benar
+- marketings-client.tsx (dashboard): kartu utama owner-only "Link Katalog Utama Showroom [KHUSUS OWNER]" (URL absolut + Salin Link Katalog + Buka Katalog); kolom/kotak "Link Toko" per rekanan: tombol Salin Link Toko (clipboard, prefer ?ref=<kode> fallback ?mkt=<id>) + Kirim Link via WA (wa.me ke nomor rekanan, pesan berisi link toko personalnya); info whitelist dgn poin baru ttg Personal Store; nama showroom diambil dari /api/showrooms/<slug> utk pesan WA
+- Lingkungan: dev server sempat crash berulang (EADDRINUSE + proses background dibunuh sandbox antar tool-call) — fix dgn (setsid bun run dev & ) double-fork subshell; reseed + backfill kode demo: Deni MKT-PGTSUG, Rina MKT-YUKFTF (Andi nonaktif)
+- E2E agent-browser lolos: ?ref=MKT-PGTSUG → katalog 11 unit TERBUKA tanpa gate (mobile 390px & desktop 1280px), badge + Tutup tampil, localStorage terisi, header chat → wa.me/6281299312210 "Halo Deni Prasetyo, saya melihat katalog...", kartu & modal CTA → wa.me/6281299312210 "Halo Deni Prasetyo, saya tertarik dengan unit Yamaha Lexi 125 S-ABS 2020 di katalog Anda (Showroom Showroom Jaya Motor). Apakah unit ini masih ada?", modal bottom-sheet (mobile) & center (desktop) normal, URL dasar tanpa param → badge + routing Deni PERSIST (atribusi tersimpan), Tutup → localStorage null + gerbang whitelist muncul lg, ?mkt=<id-rina> → badge Rina + WA ke 6281200000001, resolve-ref invalid/nonaktif/salah-showroom → 404, login owner → kartu utama + Salin Link Toko (toast sukses) + Kirim Link via WA (href berisi ?ref=MKT-PGTSUG) + kolom LINK TOKO di tabel desktop, 0 console error
+- Verifikasi unit template owner: "Halo Showroom Jaya Motor, saya tertarik dengan unit Honda Beat 110 CBS 2020 di katalog resmi MotoStock Anda. Apakah unit ini masih ada?" (showroom lokal semua whitelist — owner template diuji level fungsi)
+- Lint bersih, tsc 0 error di src/
+
+Stage Summary:
+- Link toko per marketing (?ref=KODE / ?mkt=ID) membuka katalog penuh tanpa gerbang: badge "Mitra Penjualan Resmi", SELURUH tombol WA (header/kartu/modal detail) mengarah ke nomor mitra dgn template personal; atribusi persist di localStorage sampai pembeli menekan Tutup
+- Akses tanpa referral = mode Owner: WA ke nomor resmi showroom dgn template resmi (showroom whitelist tetap lewat gerbang verifikasi rekanan)
+- Dashboard owner: kartu "Link Katalog Utama Showroom (Khusus Owner)" + per-rekanan Salin Link Toko / Kirim Link via WA — kode referral MKT-XXXXXX dibuat otomatis (rekanan baru) & di-backfill (lama) saat tab marketings dibuka
+- Catatan: foto header showroom 404 di LOKAL saja (headerUrl menunjuk file upload produksi; bukan regresi)

@@ -59,7 +59,7 @@ function estimateInstallment(price: number, tenor: number): { dp: number; monthl
 export function VehicleDetailModal({
   vehicle,
   open,
-  showroom,
+  waContact,
   showLocation,
   suspendEscape = false,
   onClose,
@@ -70,8 +70,13 @@ export function VehicleDetailModal({
   vehicle: PublicVehicle
   /** false = sedang memutar animasi keluar (panel tetap terpasang sesaat). */
   open: boolean
-  /** Kontak showroom tujuan tombol WA — null menyembunyikan CTA WA. */
-  showroom: { name: string; ownerPhone: string } | null
+  /**
+   * Kontak tujuan CTA WA modal — mengikuti logika Personal Store:
+   * referral marketing aktif → nomor marketing (template mitra),
+   * tanpa referral → nomor resmi showroom (template owner).
+   * null menyembunyikan CTA WA.
+   */
+  waContact: { name: string; phone: string; marketingName?: string | null } | null
   /** True bila showroom multi-cabang → baris lokasi cabang tampil. */
   showLocation: boolean
   /** True saat lightbox layar penuh terbuka di atas modal → listener ESC modal dilepas
@@ -89,7 +94,15 @@ export function VehicleDetailModal({
   const isSold = vehicle.status === 'sold'
   const isHeld = vehicle.status === 'hold'
   const taxAlive = isTaxAlive(vehicle.taxStatus)
-  const waHref = showroom ? waLink(showroom.ownerPhone, buildUnitInquiryText(vehicle)) : null
+  const waHref = waContact
+    ? waLink(
+        waContact.phone,
+        buildUnitInquiryText(vehicle, {
+          showroomName: waContact.name,
+          marketingName: waContact.marketingName,
+        }),
+      )
+    : null
   const installment =
     vehicle.sellingPrice != null && !isSold
       ? estimateInstallment(vehicle.sellingPrice, tenor)

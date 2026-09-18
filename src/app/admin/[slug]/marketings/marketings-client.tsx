@@ -4,12 +4,17 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
+  Copy,
+  ExternalLink,
   FileImage,
   IdCard,
+  Link2,
   Lock,
   Megaphone,
+  MessageCircle,
   Pencil,
   Plus,
+  Store,
   Trash2,
 } from 'lucide-react'
 import {
@@ -40,7 +45,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { formatDateID, formatPhoneDisplay } from '@/lib/format'
+import { copyToClipboard, formatDateID, formatPhoneDisplay, waLink } from '@/lib/format'
 import { compressImage } from '@/lib/image-compress'
 import { ApiError, qk, useMarketingsQuery } from '@/lib/queries'
 import type { MarketingPartner } from '@/lib/types'
@@ -100,6 +105,23 @@ function MarketingsPage({
 
   // Sakelar aktif/nonaktif yang sedang diproses
   const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  // Nama showroom utk pesan WA "kirim link toko" + origin absolut utk link katalog
+  const [showroomName, setShowroomName] = useState('')
+  const [origin, setOrigin] = useState('')
+  useEffect(() => {
+    setOrigin(window.location.origin)
+    let alive = true
+    fetch(`/api/showrooms/${slug}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (alive && j?.name) setShowroomName(j.name as string)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [slug])
 
   const isOwner = session.role === 'owner'
 
@@ -244,6 +266,46 @@ function MarketingsPage({
     }
   }
 
+  /**
+   * Link Toko personal marketing — katalog publik dgn parameter referral.
+   * Utamakan ?ref=<kode> (ringkas & stabil walau data rekanan berubah);
+   * fallback ?mkt=<id> bila kode belum terbentuk (rekanan lama).
+   */
+  function buildStoreLink(m: { code: string | null; id: string }): string {
+    const base = `${origin}/s/${slug}`
+    return m.code ? `${base}?ref=${m.code}` : `${base}?mkt=${m.id}`
+  }
+
+  async function handleCopyStoreLink(m: MarketingPartner) {
+    if (!origin) return toast.error('Menyiapkan link... coba sesaat lagi.')
+    const ok = await copyToClipboard(buildStoreLink(m))
+    if (ok) {
+      toast.success(
+        `Link Toko ${m.fullName} disalin — bagikan ke pembeli; semua chat masuk ke WA-nya.`,
+      )
+    } else {
+      toast.error('Gagal menyalin. Coba lagi.')
+    }
+  }
+
+  async function handleCopyMainLink() {
+    if (!origin) return toast.error('Menyiapkan link... coba sesaat lagi.')
+    const ok = await copyToClipboard(`${origin}/s/${slug}`)
+    if (ok) {
+      toast.success('Link Katalog Utama disalin — chat pembeli masuk ke WA resmi showroom.')
+    } else {
+      toast.error('Gagal menyalin. Coba lagi.')
+    }
+  }
+
+  /** Buka WhatsApp mitra dgn pesan berisi Link Toko personalnya. */
+  function sendStoreLinkViaWa(m: MarketingPartner): string {
+    const link = buildStoreLink(m)
+    const name = showroomName || 'showroom'
+    const msg = `Halo ${m.fullName}, ini Link Toko personal Anda untuk katalog ${name}:\n\n${link}\n\nBagikan link tersebut ke pembeli — semua chat WhatsApp dari pembeli langsung masuk ke nomor ini, lengkap dengan info unit yang mereka tanyakan. Terima kasih.`
+    return waLink(m.phoneNumber, msg)
+  }
+
   if (notFound) return <ShowroomNotFound slug={slug} />
 
   return (
@@ -257,6 +319,51 @@ function MarketingsPage({
       <AdminNav slug={slug} role={session.role} />
 
       <div className="mx-auto w-full max-w-4xl flex-1 space-y-4 px-4 py-4">
+        {/* Kartu utama: Link Katalog Utama Showroom (Khusus Owner)
+            — salin & bagikan langsung ke pembeli tanpa perantara marketing. */}
+        {isOwner && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="flex flex-wrap items-center gap-1.5 text-sm font-extrabold text-slate-900">
+                  <Store className="h-4 w-4 shrink-0 text-blue-700" aria-hidden />
+                  Link Katalog Utama Showroom
+                  <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-extrabold text-blue-700">
+                    KHUSUS OWNER
+                  </span>
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Link resmi katalog tanpa perantara marketing — semua chat WhatsApp pembeli
+                  langsung masuk ke nomor resmi showroom.
+                </p>
+                <p
+                  dir="ltr"
+                  className="mt-2 truncate rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-[11px] text-slate-700"
+                >
+                  {origin ? `${origin}/s/${slug}` : `/s/${slug}`}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                className="h-10 bg-blue-700 px-3 text-xs font-extrabold hover:bg-blue-800"
+                onClick={handleCopyMainLink}
+              >
+                <Copy className="mr-1 h-3.5 w-3.5" /> Salin Link Katalog
+              </Button>
+              <Button
+                variant="outline"
+                asChild
+                className="h-10 border-slate-300 px-3 text-xs font-extrabold"
+              >
+                <a href={`/s/${slug}`} target="_blank" rel="noreferrer">
+                  <ExternalLink className="mr-1 h-3.5 w-3.5" /> Buka Katalog
+                </a>
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Info cara kerja whitelist */}
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-900">
           <p className="font-extrabold">Sistem Rekanan Terdaftar (Whitelist WhatsApp):</p>
@@ -271,6 +378,11 @@ function MarketingsPage({
             </li>
             <li>
               Identitas rekanan otomatis tercatat di setiap tahanan unit (hold 2 jam).
+            </li>
+            <li>
+              Bagikan <span className="font-bold">Link Toko</span> per rekanan — pembeli yang
+              membukanya melihat katalog dgn nama mitra &amp; semua tombol WA mengarah ke nomor
+              mitra (Personal Store).
             </li>
           </ul>
         </div>
@@ -335,6 +447,7 @@ function MarketingsPage({
                     <th className="px-3 py-2.5 font-extrabold">Status</th>
                     <th className="px-3 py-2.5 font-extrabold">Terdaftar</th>
                     <th className="px-3 py-2.5 text-center font-extrabold">KTP</th>
+                    <th className="px-3 py-2.5 font-extrabold">Link Toko</th>
                     <th className="px-4 py-2.5 text-right font-extrabold">Aksi</th>
                   </tr>
                 </thead>
@@ -394,6 +507,34 @@ function MarketingsPage({
                         ) : (
                           <span className="text-[11px] text-slate-400">—</span>
                         )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col items-start gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-slate-300 px-2 text-[11px] font-extrabold"
+                            onClick={() => handleCopyStoreLink(m)}
+                            title={`Salin link katalog referral ${m.fullName}`}
+                          >
+                            <Link2 className="mr-1 h-3.5 w-3.5" /> Salin Link Toko
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-emerald-200 bg-emerald-50 px-2 text-[11px] font-extrabold text-emerald-800 hover:bg-emerald-100"
+                            asChild
+                          >
+                            <a
+                              href={sendStoreLinkViaWa(m)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`Kirim link toko via WhatsApp ke ${m.fullName}`}
+                            >
+                              <MessageCircle className="mr-1 h-3.5 w-3.5" /> Kirim Link via WA
+                            </a>
+                          </Button>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         {isOwner ? (
@@ -507,6 +648,26 @@ function MarketingsPage({
                       </Button>
                     </div>
                   )}
+
+                  {/* Link Toko personal — salin utk dibagikan pembeli / kirim via WA ke mitra */}
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className="h-10 border-slate-300 text-xs font-extrabold"
+                      onClick={() => handleCopyStoreLink(m)}
+                    >
+                      <Link2 className="mr-1 h-3.5 w-3.5" /> Salin Link Toko
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-10 border-emerald-200 bg-emerald-50 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100"
+                      asChild
+                    >
+                      <a href={sendStoreLinkViaWa(m)} target="_blank" rel="noreferrer">
+                        <MessageCircle className="mr-1 h-3.5 w-3.5" /> Kirim Link via WA
+                      </a>
+                    </Button>
+                  </div>
                 </article>
               ))}
             </div>

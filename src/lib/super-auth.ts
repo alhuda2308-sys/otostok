@@ -115,3 +115,12 @@ function randomBlock(length: number): string {
 export function generateLicenseKey(): string {
   return `MOTO-${randomBlock(4)}-${randomBlock(4)}-${randomBlock(4)}`
 }
+
+/**
+ * Generator kode referral marketing format MKT-XXXXXX — dipakai sebagai
+ * parameter ?ref= pada Link Toko personal (katalog /s/[slug]?ref=<kode>).
+ * Charset sama dgn lisensi (tanpa I/O/0/1) agar mudah dibaca/dikirim via WA.
+ */
+export function generateMarketingCode(): string {
+  return `MKT-${randomBlock(6)}`
+}

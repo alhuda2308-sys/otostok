@@ -160,6 +160,7 @@ model Marketing {
   fullName    String   @map("full_name")
   phoneNumber String   @map("phone_number") // format lokal 08xxx, unik per showroom
   addressCity String   @map("address_city") // domisili / kota asal
+  code        String?  @unique // kode referral Personal Store (MKT-XXXXXX) utk link /s/[slug]?ref=
   ktpPhotoUrl String?  @map("ktp_photo_url") // opsional, dilayani via API aman (bukan file publik)
   notes       String? // catatan khusus owner
   isActive    Boolean  @default(true) @map("is_active")

@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   buildAdText,
+  buildCatalogGreetingText,
   buildUnitInquiryText,
   copyToClipboard,
   formatDateTimeID,
@@ -40,10 +41,18 @@ import {
   loadMarketingSession,
   saveMarketingSession,
 } from '@/lib/marketing-session'
+import {
+  clearReferralSession,
+  loadReferralSession,
+  readReferralParam,
+  resolveReferral,
+  saveReferralSession,
+} from '@/lib/referral'
 import type {
   MarketingSession,
   PublicCatalogResponse,
   PublicVehicle,
+  ReferralSession,
   TaxonomyResponse,
 } from '@/lib/types'
 
@@ -70,6 +79,12 @@ export function CatalogClient({
   )
   const marketingRef = useRef<MarketingSession | null>(null)
 
+  // Katalog Digital Multi-Mitra: atribusi referral "Link Toko" marketing.
+  // Aktif bila URL punya ?ref=<kode>/?mkt=<id> yang valid, atau visitor pernah
+  // membuka link toko tsb sebelumnya (tersimpan di localStorage per showroom).
+  const [referral, setReferral] = useState<ReferralSession | null>(null)
+  const referralRef = useRef<ReferralSession | null>(null)
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [brandFilter, setBrandFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
@@ -89,7 +104,9 @@ export function CatalogClient({
     async (silent = false, session?: MarketingSession | null) => {
       if (!silent) setLoading(true)
       try {
-        const mkt = session ?? marketingRef.current
+        // Kredensial whitelist: sesi gate (rekanan login) ATAU referral Personal Store
+        // (marketing penerima link toko juga terdaftar di tabel marketings).
+        const mkt = session ?? marketingRef.current ?? referralRef.current
         const res = await fetch(`/api/showrooms/${slug}/vehicles`, {
           cache: 'no-store',
           ...(mkt ? { headers: { 'X-Mkt-Phone': mkt.phone } } : {}),
@@ -127,13 +144,35 @@ export function CatalogClient({
   )
 
   useEffect(() => {
-    // Baca sesi rekanan dari localStorage — marketing tidak perlu mengetik ulang nomor
-    const cached = loadMarketingSession(slug)
-    marketingRef.current = cached
-    setMarketing(cached)
-    // Dengan initialData (ISR) konten sudah tampil → refresh SILENT agar kartu
-    // tidak berkedip; status hold terbaru tetap diperbarui di background.
-    refetch(Boolean(initialData), cached)
+    // Resolusi referral Personal Store (?ref=/?mkt=) dulu, lalu muat katalog —
+    // supaya kredensial X-Mkt-Phone sudah tersedia sebelum fetch pertama
+    // (showroom whitelist tetap terbuka lewat link toko marketing).
+    let alive = true
+    ;(async () => {
+      const param = readReferralParam()
+      let ref: ReferralSession | null = null
+      if (param) {
+        ref = await resolveReferral(slug, param)
+        if (ref) saveReferralSession(slug, ref)
+        else ref = loadReferralSession(slug) // param tak valid → pakai atribusi tersimpan
+      } else {
+        ref = loadReferralSession(slug)
+      }
+      if (!alive) return
+      referralRef.current = ref
+      setReferral(ref)
+
+      // Baca sesi rekanan dari localStorage — marketing tidak perlu mengetik ulang nomor
+      const cached = loadMarketingSession(slug)
+      marketingRef.current = cached
+      setMarketing(cached)
+      // Dengan initialData (ISR) konten sudah tampil → refresh SILENT agar kartu
+      // tidak berkedip; status hold terbaru tetap diperbarui di background.
+      refetch(Boolean(initialData), cached)
+    })()
+    return () => {
+      alive = false
+    }
   }, [refetch, slug, initialData])
 
   // Filter kategori & merek dari konfigurasi showroom (bisa ditambah owner)
@@ -243,6 +282,19 @@ export function CatalogClient({
     refetch(false, s)
   }
 
+  /**
+   * Hapus atribusi mitra (tombol Tutup di badge) — kunjungan ini kembali ke
+   * mode Owner (semua WA mengarah ke nomor resmi showroom).
+   * Showroom whitelist akan langsung menampilkan gerbang verifikasi lagi.
+   */
+  function handleClearReferral() {
+    clearReferralSession(slug)
+    referralRef.current = null
+    setReferral(null)
+    refetch(true)
+    toast.info('Atribusi mitra dihapus — kontak kembali ke showroom.')
+  }
+
   /** Keluar / ganti nomor WhatsApp. */
   function handleChangeNumber() {
     clearMarketingSession(slug)
@@ -314,15 +366,20 @@ export function CatalogClient({
           {showroom && (
             <a
               href={waLink(
-                showroom.ownerPhone,
-                `Halo ${showroom.name}, saya lihat katalog MotoStock Anda. Ada unit yang menarik.`,
+                referral?.phone ?? showroom.ownerPhone,
+                buildCatalogGreetingText({
+                  showroomName: showroom.name,
+                  marketingName: referral?.fullName ?? null,
+                }),
               )}
               target="_blank"
               rel="noreferrer"
               className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-extrabold text-white hover:bg-emerald-800"
             >
               <MessageCircle className="h-4 w-4" aria-hidden />
-              <span className="hidden sm:inline">Chat Showroom</span>
+              <span className="hidden sm:inline">
+                {referral ? `Chat ${referral.fullName.split(' ')[0]}` : 'Chat Showroom'}
+              </span>
             </a>
           )}
         </div>
@@ -336,8 +393,29 @@ export function CatalogClient({
             />
           </div>
         )}
-        {/* Sapaan personal rekanan — hanya bila showroom memakai whitelist */}
-        {marketing && (
+        {/* Banner Personal Store — visitor datang lewat Link Toko marketing (?ref/?mkt valid
+            atau atribusi tersimpan). Semua tombol WA halaman ini mengarah ke mitra tsb. */}
+        {referral && (
+          <div className="mx-auto w-full max-w-5xl border-t border-emerald-200 bg-emerald-50">
+            <div className="flex h-10 items-center justify-between gap-2 px-4">
+              <p className="min-w-0 truncate text-xs font-extrabold text-emerald-900">
+                <BadgeCheck className="mr-1 inline h-3.5 w-3.5 text-emerald-700" aria-hidden />
+                Mitra Penjualan Resmi: {referral.fullName} • Siap Melayani Pembelian &amp; Cek Unit
+              </p>
+              <button
+                type="button"
+                onClick={handleClearReferral}
+                className="shrink-0 text-[11px] font-bold text-emerald-700 underline hover:text-emerald-900"
+                title="Hapus atribusi mitra — kontak kembali ke nomor resmi showroom"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Sapaan personal rekanan — hanya bila showroom memakai whitelist
+            (tanpa atribusi referral; mode Personal Store memakai banner mitra di atas) */}
+        {marketing && !referral && (
           <div className="mx-auto w-full max-w-5xl border-t border-slate-200 bg-blue-50">
             <div className="flex h-10 items-center justify-between gap-2 px-4">
               <p className="truncate text-xs font-extrabold text-blue-900">
@@ -581,6 +659,8 @@ export function CatalogClient({
                 showLocation={hasBranches}
                 fallbackLocName={showroom?.name ?? ''}
                 fallbackLocMaps={showroom?.mapsUrl ?? null}
+                waPhone={referral?.phone ?? data.showroom.ownerPhone}
+                marketingName={referral?.fullName ?? null}
                 onCopy={() => handleCopy(v)}
                 onHold={() => setHoldTarget(v)}
                 onOpenDetail={() => openDetail(v.id)}
@@ -611,13 +691,21 @@ export function CatalogClient({
 
       {/* Modal detail unit — data dari state client (instan, tanpa fetch baru).
           Klik foto di modal → lightbox layar penuh di atasnya (z-[70] > z-[60]).
-          Modal dilepas SETELAH animasi keluar selesai (closeDetail). */}
+          Modal dilepas SETELAH animasi keluar selesai (closeDetail).
+          CTA WA mengikuti logika Personal Store: referral mitra aktif → nomor
+          marketing, tanpa referral → nomor resmi showroom. */}
       {detailTarget && (
         <VehicleDetailModal
           vehicle={detailTarget}
           open={!detailClosing}
-          showroom={
-            data ? { name: data.showroom.name, ownerPhone: data.showroom.ownerPhone } : null
+          waContact={
+            data
+              ? {
+                  name: data.showroom.name,
+                  phone: referral?.phone ?? data.showroom.ownerPhone,
+                  marketingName: referral?.fullName ?? null,
+                }
+              : null
           }
           showLocation={hasBranches}
           suspendEscape={gallery != null}
@@ -636,6 +724,8 @@ function CatalogCard({
   showLocation,
   fallbackLocName,
   fallbackLocMaps,
+  waPhone,
+  marketingName,
   onCopy,
   onHold,
   onOpenDetail,
@@ -648,6 +738,10 @@ function CatalogCard({
   showLocation: boolean
   fallbackLocName: string
   fallbackLocMaps: string | null
+  /** Tujuan WA kartu — nomor marketing (referral aktif) atau owner showroom. */
+  waPhone: string
+  /** Terisi = mode Personal Store → template pesan mitra. */
+  marketingName: string | null
   onCopy: () => void
   onHold: () => void
   /** Buka Modal Detail Unit (juga dipicu klik di area kartu manapun). */
@@ -660,8 +754,14 @@ function CatalogCard({
   const isHeld = v.status === 'hold'
   const locName = v.branch?.name || fallbackLocName
   const locMaps = v.branch?.mapsUrl ?? fallbackLocMaps
-  /** Link WA spesifik unit — prefill nama/tahun/harga agar owner mudah membalas. */
-  const unitWaHref = waLink(showroom.ownerPhone, buildUnitInquiryText(v))
+  /** Link WA spesifik unit — tujuan & template mengikuti mode (mitra/owner). */
+  const unitWaHref = waLink(
+    waPhone,
+    buildUnitInquiryText(v, {
+      showroomName: showroom.name,
+      marketingName,
+    }),
+  )
 
   /** Bagikan foto utama + caption spek motor via Web Share API (langsung ke WA/medsos). */
   async function handleShare() {

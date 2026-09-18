@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { PRIVATE_STALE_WHILE_REVALIDATE } from '@/lib/http-cache'
 import { requireOwnerSession, requireShowroomSession } from '@/lib/auth'
+import { uniqueMarketingCode } from '@/lib/marketing-code'
 
 /** Bentuk rekanan yang dikirim ke dashboard — URL KTP adalah endpoint aman ber-sesi. */
 function toInfo(
@@ -10,6 +11,7 @@ function toInfo(
     fullName: string
     phoneNumber: string
     addressCity: string
+    code: string | null
     notes: string | null
     isActive: boolean
     createdAt: Date
@@ -26,6 +28,8 @@ function toInfo(
       ? `0${m.phoneNumber.slice(2)}`
       : m.phoneNumber,
     addressCity: m.addressCity,
+    // kode referral Personal Store (MKT-XXXXXX) — parameter ?ref= link toko
+    code: m.code,
     notes: m.notes,
     isActive: m.isActive,
     createdAt: m.createdAt.toISOString(),
@@ -69,6 +73,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
       fullName: true,
       phoneNumber: true,
       addressCity: true,
+      code: true,
       notes: true,
       isActive: true,
       createdAt: true,
@@ -78,6 +83,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
       },
     },
   })
+
+  // Backfill kode referral Personal Store utk rekanan lama yang belum punya
+  // (idempoten — hanya berjalan selama masih ada yang kosong). Wajib ada agar
+  // tombol "Salin Link Toko" dashboard selalu bisa memakai ?ref=<kode>.
+  const missingCode = marketings.filter((m) => !m.code)
+  if (missingCode.length > 0) {
+    for (const m of missingCode) {
+      try {
+        const code = await uniqueMarketingCode()
+        await db.marketing.update({ where: { id: m.id }, data: { code } })
+        m.code = code
+      } catch (e) {
+        console.error('[admin marketings] backfill code gagal:', e)
+      }
+    }
+  }
 
   return NextResponse.json(
     {
@@ -89,6 +110,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
         fullName: m.fullName,
         phoneNumber: m.phoneNumber,
         addressCity: m.addressCity,
+        code: m.code,
         notes: m.notes,
         isActive: m.isActive,
         createdAt: m.createdAt,
@@ -179,6 +201,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
         fullName,
         phoneNumber: phone,
         addressCity,
+        // kode referral Personal Store langsung tersedia saat rekanan dibuat
+        code: await uniqueMarketingCode(),
         notes: notes || null,
         ktpPhotoUrl: ktpPhotoUrl || null,
         isActive: true,
