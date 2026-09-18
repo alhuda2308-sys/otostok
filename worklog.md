@@ -834,3 +834,21 @@ Work Log:
 Stage Summary:
 - Portal Kerja kini punya popup detail unit penuh (galeri swipe/thumbnail, spesifikasi, deskripsi, status, simulasi angsuran) dgn alat khusus marketing di bar aksi: Salin Info Lengkap + Tahan Unit Ini
 - Satu komponen modal dipakai dua konteks: katalog publik (CTA WA pembeli) vs portal (alat kerja marketing) — dipilah lewat props opsional, tanpa duplikasi
+---
+Task ID: portal-kartu-tombol-responsif
+Agent: main (Z.ai Code)
+Task: Rapikan tata letak tombol aksi unit di kartu Portal Kerja Marketing (mobile-friendly, tombol full-width di bawah foto+info)
+
+Work Log:
+- Diagnosis dari screenshot user: kartu portal lama = flex horizontal (foto kiri, SEMUA tombol di kolom kanan samping foto) → 4 tombol diperas di kolom sempit, teks "Tahan Unit" terpotong, "Komisi Rp 700.000" patah di tengah angka
+- Restrukturisasi PartnerVehicleCard jadi 2 section vertikal: (1) ATAS = foto kiri aspect-[4/3] w-28 sm:w-36 rounded-lg ring-slate-200 + info kanan (judul/tahun/plat/harga OTR/badge status/komisi); (2) BAWAH = pemisah border-t border-slate-100 + pt-3, tombol LEBAR PENUH grid grid-cols-2 gap-2 sm:grid-cols-4
+- Urutan tombol sesuai spec: Baris 1 mobile [Tahan Unit | Lihat Detail], Baris 2 [Salin Iklan | Materi Iklan]; sm+ = 4 kolom satu baris (max-w-3xl container → ±172px/tombol, proporsional)
+- Styling tombol: semua h-10 (40px touch target) px-3 text-xs font-semibold; Tahan Unit = solid bg-blue-700; Lihat Detail/Salin Iklan/Materi Iklan = outline clean border-slate-200 bg-slate-50 hover:bg-slate-100 (Materi Iklan tak lagi biru-tint); ikon tanpa mr (Button base sudah gap-2 + svg size-4 auto)
+- Harga+komisi dipisah jadi 2 <p> dalam flex flex-wrap items-baseline → komisi wrap UTUH ke baris baru (angka tak pernah patah)
+- Unit terjual: Lihat Detail full-width tetap dengan separator konsisten
+- E2E agent-browser: 390px → grid 2x2 exact (Tahan x29/Lihat x199 baris sama; Salin/Materi baris kedua), tombol 162x40px, clipped:[] (0 teks terpotong), hScroll false; 900px → 4 kolom satu baris @172px, hScroll false; modal Lihat Detail unit TER-BOOKING (Salin Info Lengkap + catatan ditahan, tanpa tombol Tahan) & unit READY (kedua CTA) tetap berfungsi; 0 fetch API saat buka modal (hanya load gambar galeri); tombol kartu Tahan Unit → HoldDialog tunggal (1 dialog, tak ada tumpukan); border-t separator terverifikasi (slate-100, pt 12px); 0 error console
+- Lint bersih; tsc 0 error di src/
+
+Stage Summary:
+- Kartu portal kini pola 2-lapis: info di atas (foto+spek) — alat kerja full-width di bawah; di HP tombol besar 40px 2x2 tanpa teks terpotong, di desktop 4 kolom rapi
+- Perubahan terisolasi di partner-client.tsx (95+/83-) — katalog publik & modal tidak disentuh (regresi aman)

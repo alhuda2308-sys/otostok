@@ -483,122 +483,134 @@ function PartnerVehicleCard({
   }
 
   return (
-    <article className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      {/* Foto kecil — klik membuka Modal Detail Unit */}
-      <button
-        type="button"
-        onClick={onOpenDetail}
-        aria-label={`Lihat detail ${v.brand} ${v.model}`}
-        className="relative h-20 w-28 shrink-0 overflow-hidden rounded-md bg-slate-100 transition-opacity hover:opacity-90"
-      >
-        {v.photos[0] ? (
-          <img
-            src={v.photos[0]}
-            alt={`Foto ${v.brand} ${v.model} ${v.year}`}
-            className={`h-full w-full object-cover ${isSold ? 'opacity-60' : ''}`}
-          />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center">
-            <Camera className="h-6 w-6 text-slate-300" aria-hidden />
-          </span>
-        )}
-        {v.photos.length > 1 && (
-          <span className="absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded bg-slate-900/70 px-1 py-0.5 text-[9px] font-bold text-white">
-            <Camera className="h-2.5 w-2.5" aria-hidden /> {v.photos.length}
-          </span>
-        )}
-      </button>
-
-      {/* Info + alat kerja */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-extrabold text-slate-900">
-              {v.brand} {v.model}
-            </h3>
-            <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-              {v.year} • {v.licensePlate}
-              {v.odometer != null ? ` • ${formatKm(v.odometer)}` : ''}
-              {v.branch ? ` • ${v.branch.name}` : ''}
-            </p>
-          </div>
-          <StatusBadge status={v.status} />
-        </div>
-
-        <p className="mt-1 text-base font-extrabold tracking-tight text-slate-900">
-          {formatRupiah(v.sellingPrice)}
-          {v.commissionAmount != null && !isSold && (
-            <span className="ml-2 text-xs font-extrabold text-emerald-700">
-              Komisi {formatRupiah(v.commissionAmount)}
+    <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      {/* ===== BAGIAN ATAS — foto kiri, info kanan (tanpa tombol) ===== */}
+      <div className="flex gap-3">
+        {/* Foto unit — klik membuka Modal Detail Unit */}
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          aria-label={`Lihat detail ${v.brand} ${v.model}`}
+          className="relative aspect-[4/3] w-28 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 transition-opacity hover:opacity-90 sm:w-36"
+        >
+          {v.photos[0] ? (
+            <img
+              src={v.photos[0]}
+              alt={`Foto ${v.brand} ${v.model} ${v.year}`}
+              className={`h-full w-full object-cover ${isSold ? 'opacity-60' : ''}`}
+            />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center">
+              <Camera className="h-6 w-6 text-slate-300" aria-hidden />
             </span>
           )}
-        </p>
+          {v.photos.length > 1 && (
+            <span className="absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded bg-slate-900/70 px-1 py-0.5 text-[9px] font-bold text-white">
+              <Camera className="h-2.5 w-2.5" aria-hidden /> {v.photos.length}
+            </span>
+          )}
+        </button>
 
-        {isHeld && v.activeHold && (
-          <p className="mt-1 text-[11px] font-bold leading-tight text-amber-800">
-            Ditahan oleh {v.activeHold.marketingName} •{' '}
-            <Countdown
-              expiresAt={v.activeHold.expiresAt}
-              className="tabular-nums"
-              onDone={onHoldExpired}
-            />
-          </p>
-        )}
+        {/* Judul, tahun/plat, harga OTR, badge status, komisi */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate text-sm font-extrabold text-slate-900">
+                {v.brand} {v.model}
+              </h3>
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                {v.year} • {v.licensePlate}
+                {v.odometer != null ? ` • ${formatKm(v.odometer)}` : ''}
+                {v.branch ? ` • ${v.branch.name}` : ''}
+              </p>
+            </div>
+            <StatusBadge status={v.status} />
+          </div>
 
-        {/* Alat kerja — dipindah dari katalog publik + Lihat Detail (modal) */}
-        {!isSold && (
-          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {/* Harga + komisi — flex-wrap agar komisi pindah baris UTUH (angka tak terpotong) */}
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <p className="text-base font-extrabold tracking-tight text-slate-900">
+              {formatRupiah(v.sellingPrice)}
+            </p>
+            {v.commissionAmount != null && !isSold && (
+              <p className="text-xs font-extrabold text-emerald-700">
+                Komisi {formatRupiah(v.commissionAmount)}
+              </p>
+            )}
+          </div>
+
+          {isHeld && v.activeHold && (
+            <p className="mt-1 text-[11px] font-bold leading-tight text-amber-800">
+              Ditahan oleh {v.activeHold.marketingName} •{' '}
+              <Countdown
+                expiresAt={v.activeHold.expiresAt}
+                className="tabular-nums"
+                onDone={onHoldExpired}
+              />
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ===== BAGIAN BAWAH — tombol aksi LEBAR PENUH di bawah foto+info ===== */}
+      {!isSold && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {/* Baris 1 mobile: Tahan Unit | Lihat Detail — primer solid utk aksi utama */}
             <Button
-              className="h-9 bg-blue-700 px-2 text-[11px] font-extrabold hover:bg-blue-800"
+              className="h-10 min-h-[40px] bg-blue-700 px-3 text-xs font-semibold hover:bg-blue-800"
               disabled={isHeld}
               onClick={onHold}
               title={isHeld ? 'Unit sedang ditahan' : 'Kunci unit 2 jam atas nama Anda'}
             >
-              <Lock className="mr-1 h-3.5 w-3.5" />
+              <Lock aria-hidden />
               {isHeld ? 'Ditahan' : 'Tahan Unit'}
             </Button>
             <Button
               variant="outline"
-              className="h-9 border-blue-200 bg-blue-50 px-2 text-[11px] font-extrabold text-blue-800 hover:bg-blue-100"
-              onClick={handleShare}
-              disabled={sharing}
+              className="h-10 min-h-[40px] border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              onClick={onOpenDetail}
             >
-              {sharing ? (
-                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden />
-              ) : (
-                <Share2 className="mr-1 h-3.5 w-3.5" aria-hidden />
-              )}
-              Materi Iklan
+              <Info aria-hidden />
+              Lihat Detail
             </Button>
+            {/* Baris 2 mobile: Salin Iklan | Materi Iklan — secondary outline bersih */}
             <Button
               variant="outline"
-              className="h-9 border-slate-300 bg-white px-2 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
+              className="h-10 min-h-[40px] border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
               onClick={onCopyAd}
             >
-              <ClipboardCopy className="mr-1 h-3.5 w-3.5" />
+              <ClipboardCopy aria-hidden />
               Salin Iklan
             </Button>
             <Button
               variant="outline"
-              className="h-9 border-slate-300 bg-white px-2 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
-              onClick={onOpenDetail}
+              className="h-10 min-h-[40px] border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              onClick={handleShare}
+              disabled={sharing}
             >
-              <Info className="mr-1 h-3.5 w-3.5" />
-              Lihat Detail
+              {sharing ? (
+                <Loader2 className="animate-spin" aria-hidden />
+              ) : (
+                <Share2 aria-hidden />
+              )}
+              Materi Iklan
             </Button>
           </div>
-        )}
-        {isSold && (
+        </div>
+      )}
+      {isSold && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
           <Button
             variant="outline"
-            className="mt-2 h-9 w-full border-slate-300 bg-white px-2 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
+            className="h-10 min-h-[40px] w-full border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
             onClick={onOpenDetail}
           >
-            <Info className="mr-1 h-3.5 w-3.5" />
+            <Info aria-hidden />
             Lihat Detail
           </Button>
-        )}
-      </div>
+        </div>
+      )}
     </article>
   )
 }
