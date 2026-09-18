@@ -1,11 +1,14 @@
 -- ============================================================
 -- MotoStock — Migrasi SINKRONISASI untuk database Supabase yang SUDAH ADA
--- (v2 — tahan segala kondisi kolom: text[], json, jsonb, text)
+-- (v3 — tahan segala kondisi kolom: text[], json, jsonb, text)
 -- ============================================================
 -- KAPAN dipakai:
 --   Bila database Supabase dibuat SEBELUM versi skema terkini, tabel lama
 --   bisa KURANG kolom/index — gejalanya:
 --     • Gagal tambah/edit motor: P2022 "column ... does not exist"
+--     • Tab Marketing dashboard: "Gagal memuat data (500)" / tambah rekanan
+--       "kesalahan server"  → kolom "code" hilang (fitur Link Toko Personal
+--       Store) — v3 menambahkannya kembali
 --     • "number of array dimensions ... exceeds maximum allowed (6)"
 --       → kolom teks terlanjur bertipe array (text[])
 --     • Slug duplikat terdeteksi meski seharusnya unik
@@ -225,6 +228,10 @@ ALTER TABLE "vehicles" ADD COLUMN IF NOT EXISTS "branch_id" UUID;
 ALTER TABLE "marketings" ADD COLUMN IF NOT EXISTS "full_name" TEXT NOT NULL DEFAULT '';
 ALTER TABLE "marketings" ADD COLUMN IF NOT EXISTS "phone_number" TEXT NOT NULL DEFAULT '';
 ALTER TABLE "marketings" ADD COLUMN IF NOT EXISTS "address_city" TEXT NOT NULL DEFAULT '';
+-- kode referral Personal Store (MKT-XXXXXX) — WAJIB utk fitur Link Toko
+-- (?ref=) & tombol dashboard; tanpa kolom ini SEMUA operasi marketing 500
+-- (P2022 column does not exist)
+ALTER TABLE "marketings" ADD COLUMN IF NOT EXISTS "code" TEXT;
 ALTER TABLE "marketings" ADD COLUMN IF NOT EXISTS "ktp_photo_url" TEXT;
 ALTER TABLE "marketings" ADD COLUMN IF NOT EXISTS "notes" TEXT;
 ALTER TABLE "marketings" ADD COLUMN IF NOT EXISTS "is_active" BOOLEAN NOT NULL DEFAULT true;
@@ -264,7 +271,7 @@ BEGIN
       ('branches','name'),('branches','address'),('branches','maps_url'),
       ('taxonomies','kind'),('taxonomies','name'),
       ('vehicles','brand'),('vehicles','model'),('vehicles','category'),('vehicles','license_plate'),('vehicles','color'),('vehicles','tax_status'),('vehicles','document_status'),('vehicles','status'),('vehicles','photos'),('vehicles','notes'),('vehicles','arrival_notes'),('vehicles','arrival_photos'),('vehicles','sold_by'),('vehicles','handover_photo'),
-      ('marketings','full_name'),('marketings','phone_number'),('marketings','address_city'),('marketings','ktp_photo_url'),('marketings','notes'),
+      ('marketings','full_name'),('marketings','phone_number'),('marketings','address_city'),('marketings','code'),('marketings','ktp_photo_url'),('marketings','notes'),
       ('bookings','marketing_name'),('bookings','marketing_phone'),('bookings','status')
     ) AS wanted(tbl, col)
       ON c.table_name = wanted.tbl AND c.column_name = wanted.col
@@ -333,6 +340,10 @@ DO $$ BEGIN
   CREATE UNIQUE INDEX IF NOT EXISTS "marketings_showroom_id_phone_number_key" ON "marketings"("showroom_id", "phone_number");
 EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index marketings_..._key: % (cek duplikat phone_number)', SQLERRM; END $$;
 
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS "marketings_code_key" ON "marketings"("code");
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Index marketings_code_key: % (cek duplikat kode referral — NULL aman, hapus duplikat non-NULL)', SQLERRM; END $$;
+
 CREATE INDEX IF NOT EXISTS "bookings_vehicle_id_status_idx" ON "bookings"("vehicle_id", "status");
 CREATE INDEX IF NOT EXISTS "bookings_marketing_id_idx" ON "bookings"("marketing_id");
 
@@ -390,6 +401,10 @@ SELECT
       AND column_name IN ('commission_amount','branch_id','purchased_at',
                           'arrival_photos','sold_at','handover_photo','updated_at')
   ) AS vehicles_kolom_baru_ok,
+  (SELECT count(*) FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'marketings'
+      AND column_name = 'code'
+  ) AS marketings_code_ok, -- HARUS 1 (bila 0 → fitur Link Toko & daftar marketing masih 500)
   (SELECT count(*) FROM pg_indexes
     WHERE schemaname = 'public' AND indexname = 'showrooms_slug_key'
   ) AS slug_unique_ok,

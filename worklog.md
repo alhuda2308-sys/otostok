@@ -763,3 +763,21 @@ Stage Summary:
 - Akses tanpa referral = mode Owner: WA ke nomor resmi showroom dgn template resmi (showroom whitelist tetap lewat gerbang verifikasi rekanan)
 - Dashboard owner: kartu "Link Katalog Utama Showroom (Khusus Owner)" + per-rekanan Salin Link Toko / Kirim Link via WA — kode referral MKT-XXXXXX dibuat otomatis (rekanan baru) & di-backfill (lama) saat tab marketings dibuka
 - Catatan: foto header showroom 404 di LOKAL saja (headerUrl menunjuk file upload produksi; bukan regresi)
+
+---
+Task ID: fix-prod-supabase-mkt-code-column
+Agent: main (Z.ai Code)
+Task: Perbaiki 500 "Gagal memuat data" di tab Marketing & "kesalahan server" saat mendaftarkan marketing (laporan user di PRODUKSI)
+
+Work Log:
+- Diagnosis: commit 55fc357 (katalog multi-mitra) deploy ke Vercel memakai kolom marketings.code (MKT-XXXXXX), tapi database Supabase produksi TIDAK pernah dimigrasi — supabase/schema.sql (acuan pembuatan DB) tidak berisi kolom code → Prisma P2022 "column does not exist" di GET/POST marketings + resolve-ref → 500 di ketiganya
+- Bukti: git show 55fc357 (satu-satunya perubahan DB = Marketing.code), supabase/schema.sql lama tanpa "code", dev.log lokal bersih (semua 200, DB lokal SQLite sudah ter-push dgn backfill kode Deni/Rina/Andi)
+- Fix supabase/schema.sql: kolom "code" TEXT di CREATE TABLE marketings + CREATE UNIQUE INDEX "marketings_code_key"
+- Fix supabase/migration-sync-existing-db.sql → v3: ALTER TABLE ADD COLUMN IF NOT EXISTS "code" TEXT, masuk daftar koreksi tipe ('marketings','code'), index unik marketings_code_key (DO block tahan duplikat), + baris verifikasi baru marketings_code_ok (harus 1)
+- Verifikasi lokal: DB SQLite punya kolom code + kode terisi; lint bersih
+
+Stage Summary:
+- ROOT CAUSE bukan bug kode — murni database produksi tertinggal satu kolom
+- SOLUSI USER: Supabase Dashboard → SQL Editor → paste seluruh supabase/migration-sync-existing-db.sql (idempotent, aman utk data) → Run → hasil panel Results harus marketings_code_ok = 1 → refresh dashboard, tanpa redeploy
+- Quick fix 2 baris juga disediakan di chat utk pemulihan instan
+- Rekap 500 kemungkinan lain sudah tersingkir: dev.log lokal bersih; API route benar; lokal E2E lama lolos

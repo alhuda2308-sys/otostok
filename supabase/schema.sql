@@ -138,6 +138,7 @@ CREATE TABLE "marketings" (
     "full_name" TEXT NOT NULL,
     "phone_number" TEXT NOT NULL,
     "address_city" TEXT NOT NULL,
+    "code" TEXT, -- kode referral Personal Store (MKT-XXXXXX) utk link /s/[slug]?ref=
     "ktp_photo_url" TEXT,
     "notes" TEXT,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
@@ -186,6 +187,9 @@ CREATE INDEX "vehicles_branch_id_idx" ON "vehicles"("branch_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "marketings_showroom_id_phone_number_key" ON "marketings"("showroom_id", "phone_number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "marketings_code_key" ON "marketings"("code");
 
 -- CreateIndex
 CREATE INDEX "bookings_vehicle_id_status_idx" ON "bookings"("vehicle_id", "status");
