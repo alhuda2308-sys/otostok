@@ -781,3 +781,20 @@ Stage Summary:
 - SOLUSI USER: Supabase Dashboard → SQL Editor → paste seluruh supabase/migration-sync-existing-db.sql (idempotent, aman utk data) → Run → hasil panel Results harus marketings_code_ok = 1 → refresh dashboard, tanpa redeploy
 - Quick fix 2 baris juga disediakan di chat utk pemulihan instan
 - Rekap 500 kemungkinan lain sudah tersingkir: dev.log lokal bersih; API route benar; lokal E2E lama lolos
+
+---
+Task ID: fix-marketings-table-buttons-invisible
+Agent: main (Z.ai Code)
+Task: Perbaiki tombol tak terlihat di "Daftar Rekanan Marketing" (laporan user)
+
+Work Log:
+- Diagnosis: tabel desktop 9 kolom dibungkus div `overflow-hidden md:block` TANPA overflow-x-auto; konten admin page max-w-4xl (864px) sementara lebar natural kolom ±1000px → kolom Link Toko & Aksi TERPOTONG di SEMUA lebar desktop (bug paling parah 768–1200px; auto table layout mengabaikan max-w sel, Nama melebar 335px)
+- Fix marketings-client.tsx: (1) wrapper tabel → `overflow-x-auto lg:block` + tabel `table-fixed min-w-[840px]`; (2) lebar kolom eksplisit via th (Nama 130/WA 136/Domisili 78/Performa 102/Status 60/Terdaftar 95/KTP 80/Link Toko 165/Aksi 88 = 826 ≤ 864); (3) breakpoint tabel md→lg & kartu md:hidden→lg:hidden (di bawah 1024px tampil KARTU — semua tombol selalu terlihat); (4) kolom Terdaftar (tanggal) hidden <xl; (5) halaman `max-w-4xl xl:max-w-6xl` (xl: konten 1120px, 9 kolom muat penuh); (6) padding sel rapat (px-2) + Performa text-[11px] + title attr nama ter-truncate
+- Preventive reports-client.tsx: wrapper `overflow-hidden`→`overflow-x-auto` + tabel min-w-[820px]
+- E2E agent-browser: 900px & 390px → kartu, 4 tombol/rekanan terlihat semua, tanpa h-scroll; 1024px & 1150px → tabel 8 kolom fit 862px, scrollable:false, 0 overflow sel; 1280px → tabel 9 kolom fit 1118px dgn TERDAFTAR, semua tombol Link Toko terlihat (screenshot); login owner owner/demo1234; console bersih
+- Lint bersih
+
+Stage Summary:
+- Root cause: overflow-hidden memotong kolom kanan tabel (bukan bug data/API)
+- Pola responsif final: <1024px kartu grid 2 kolom (semua tombol) → 1024–1279px tabel 8 kolom fit → ≥1280px tabel 9 kolom penuh; overflow-x-auto sbg jaring pengaman — tabel tidak pernah memotong tombol lagi
+- Pembelajaran: table-cell max-width tidak reliabel di auto layout → wajib table-fixed + lebar th eksplisit utk tabel kolom-banyak di container sempit

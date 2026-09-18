@@ -318,7 +318,9 @@ function MarketingsPage({
       />
       <AdminNav slug={slug} role={session.role} />
 
-      <div className="mx-auto w-full max-w-4xl flex-1 space-y-4 px-4 py-4">
+      {/* max-w-4xl di bawah xl (konten pas dgn header); xl: max-w-6xl agar
+          tabel 9 kolom rekanan muat TANPA scroll/memotong tombol Link Toko */}
+      <div className="mx-auto w-full max-w-4xl flex-1 space-y-4 px-4 py-4 xl:max-w-6xl">
         {/* Kartu utama: Link Katalog Utama Showroom (Khusus Owner)
             — salin & bagikan langsung ke pembeli tanpa perantara marketing. */}
         {isOwner && (
@@ -433,29 +435,32 @@ function MarketingsPage({
           </div>
         )}
 
-        {/* Tabel desktop */}
+        {/* Tabel desktop — hanya ≥lg; di bawah itu kartu (semua tombol selalu terlihat).
+            overflow-x-auto + min-w: bila kolom melebihi lebar container, tabel
+            MENGGULIR — tidak pernah memotong kolom Link Toko/Aksi (bug: dulu
+            overflow-hidden memotong tombol di kanan pada layar 768–1200px). */}
         {!loading && partners.length > 0 && (
           <>
-            <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm md:block">
-              <table className="w-full text-left text-sm">
+            <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm lg:block">
+              <table className="w-full min-w-[840px] table-fixed text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-2.5 font-extrabold">Nama</th>
-                    <th className="px-3 py-2.5 font-extrabold">WhatsApp</th>
-                    <th className="px-3 py-2.5 font-extrabold">Domisili</th>
-                    <th className="px-3 py-2.5 text-center font-extrabold">Performa</th>
-                    <th className="px-3 py-2.5 font-extrabold">Status</th>
-                    <th className="px-3 py-2.5 font-extrabold">Terdaftar</th>
-                    <th className="px-3 py-2.5 text-center font-extrabold">KTP</th>
-                    <th className="px-3 py-2.5 font-extrabold">Link Toko</th>
-                    <th className="px-4 py-2.5 text-right font-extrabold">Aksi</th>
+                    <th className="w-[130px] px-3 py-2.5 font-extrabold">Nama</th>
+                    <th className="w-[136px] px-3 py-2.5 font-extrabold">WhatsApp</th>
+                    <th className="w-[78px] px-3 py-2.5 font-extrabold">Domisili</th>
+                    <th className="w-[102px] px-2 py-2.5 text-center font-extrabold">Performa</th>
+                    <th className="w-[60px] px-2 py-2.5 font-extrabold">Status</th>
+                    <th className="hidden w-[95px] px-3 py-2.5 font-extrabold xl:table-cell">Terdaftar</th>
+                    <th className="w-[80px] px-2 py-2.5 text-center font-extrabold">KTP</th>
+                    <th className="w-[165px] px-2 py-2.5 font-extrabold">Link Toko</th>
+                    <th className="w-[88px] px-2 py-2.5 text-right font-extrabold">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {partners.map((m) => (
                     <tr key={m.id} className="border-b border-slate-100 last:border-0">
-                      <td className="max-w-[180px] px-4 py-3">
-                        <p className="truncate font-extrabold text-slate-900">{m.fullName}</p>
+                      <td className="px-3 py-3">
+                        <p className="truncate font-extrabold text-slate-900" title={m.fullName}>{m.fullName}</p>
                         {m.notes && (
                           <p className="mt-0.5 truncate text-[11px] text-slate-500" title={m.notes}>
                             {m.notes}
@@ -466,12 +471,12 @@ function MarketingsPage({
                         {formatPhoneDisplay(m.phoneNumber)}
                       </td>
                       <td className="px-3 py-3 text-slate-700">{m.addressCity}</td>
-                      <td className="whitespace-nowrap px-3 py-3 text-center text-xs">
+                      <td className="whitespace-nowrap px-2 py-3 text-center text-[11px]">
                         <span className="font-bold text-amber-700">Tahan {m.holdCount}</span>
                         <span className="mx-1 text-slate-300">•</span>
                         <span className="font-bold text-emerald-700">Laku {m.soldCount}</span>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-2 py-3">
                         {isOwner ? (
                           <Switch
                             checked={m.isActive}
@@ -491,10 +496,10 @@ function MarketingsPage({
                           </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-xs text-slate-600">
+                      <td className="hidden whitespace-nowrap px-3 py-3 text-xs text-slate-600 xl:table-cell">
                         {formatDateID(m.createdAt)}
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className="px-2 py-3 text-center">
                         {m.hasKtp ? (
                           <Button
                             variant="outline"
@@ -508,7 +513,7 @@ function MarketingsPage({
                           <span className="text-[11px] text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-2 py-3">
                         <div className="flex flex-col items-start gap-1">
                           <Button
                             variant="outline"
@@ -536,7 +541,7 @@ function MarketingsPage({
                           </Button>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3">
                         {isOwner ? (
                           <div className="flex justify-end gap-1.5">
                             <Button
@@ -568,8 +573,8 @@ function MarketingsPage({
               </table>
             </div>
 
-            {/* Kartu mobile */}
-            <div className="space-y-2.5 md:hidden">
+            {/* Kartu mobile & tablet (<lg) — grid 2 kolom, semua tombol terlihat */}
+            <div className="space-y-2.5 lg:hidden">
               {partners.map((m) => (
                 <article
                   key={m.id}

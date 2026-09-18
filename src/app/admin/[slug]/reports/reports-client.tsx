@@ -264,9 +264,9 @@ function ReportsPage({
                 </p>
               </div>
             ) : (
-              <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                {/* Desktop: tabel */}
-                <table className="hidden w-full text-left text-sm md:table">
+              <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                {/* Desktop: tabel — min-w + scroll, tidak pernah memotong kolom kanan */}
+                <table className="hidden w-full min-w-[820px] text-left text-sm md:table">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                       <th className="px-4 py-2.5 font-bold">Tanggal</th>
