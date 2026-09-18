@@ -7,6 +7,7 @@ import {
   Camera,
   ClipboardCopy,
   ExternalLink,
+  Info,
   Loader2,
   Lock,
   MapPin,
@@ -19,11 +20,13 @@ import { HoldDialog } from '@/components/hold-dialog'
 import { MarketingGate } from '@/components/marketing-gate'
 import { PhotoLightbox } from '@/components/photo-lightbox'
 import { StatusBadge } from '@/components/status-badge'
+import { VehicleDetailModal } from '@/components/vehicle-detail-modal'
 import { VehiclePhoto } from '@/components/vehicle-photo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   buildAdText,
+  buildUnitInquiryText,
   copyToClipboard,
   formatDateTimeID,
   formatKm,
@@ -74,6 +77,12 @@ export function CatalogClient({
   const [q, setQ] = useState('')
   const [holdTarget, setHoldTarget] = useState<PublicVehicle | null>(null)
   const [gallery, setGallery] = useState<{ vehicle: PublicVehicle; index: number } | null>(null)
+  /** ID unit yang modal detailnya terbuka — objek unit DIDERIVASI dari data terbaru,
+   *  sehingga konten modal ikut segar saat auto-refresh (mis. hold kedaluwarsa → Ready). */
+  const [detailId, setDetailId] = useState<string | null>(null)
+  /** true = modal sedang memutar animasi keluar (data unit baru dilepas setelah selesai). */
+  const [detailClosing, setDetailClosing] = useState(false)
+  const detailCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [taxonomy, setTaxonomy] = useState<TaxonomyResponse | null>(null)
 
   const refetch = useCallback(
@@ -165,6 +174,39 @@ export function CatalogClient({
   // Cabang aktif — UI lokasi (badge, filter, Maps) otomatis hilang bila kosong
   const branches = data?.branches ?? []
   const hasBranches = branches.length > 0
+
+  /** Unit utk modal detail — diambil dari data TERBARU (bukan snapshot lama). */
+  const detailTarget = useMemo(
+    () => data?.vehicles.find((v) => v.id === detailId) ?? null,
+    [data, detailId],
+  )
+
+  /** Buka modal detail unit — batal animasi keluar yang masih berjalan (bila ada). */
+  function openDetail(id: string) {
+    if (detailCloseTimer.current) {
+      clearTimeout(detailCloseTimer.current)
+      detailCloseTimer.current = null
+    }
+    setDetailClosing(false)
+    setDetailId(id)
+  }
+
+  /** Tutup modal — tunggu animasi keluar (±320ms) selesai baru lepas data unit. */
+  function closeDetail() {
+    setDetailClosing(true)
+    detailCloseTimer.current = setTimeout(() => {
+      setDetailId(null)
+      setDetailClosing(false)
+      detailCloseTimer.current = null
+    }, 320)
+  }
+
+  // Bersihkan timer tutup-modal saat katalog unmount
+  useEffect(() => {
+    return () => {
+      if (detailCloseTimer.current) clearTimeout(detailCloseTimer.current)
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     if (!data) return []
@@ -541,7 +583,7 @@ export function CatalogClient({
                 fallbackLocMaps={showroom?.mapsUrl ?? null}
                 onCopy={() => handleCopy(v)}
                 onHold={() => setHoldTarget(v)}
-                onOpenGallery={(i) => setGallery({ vehicle: v, index: i })}
+                onOpenDetail={() => openDetail(v.id)}
                 onHoldExpired={() => refetch(true)}
               />
             ))}
@@ -566,6 +608,24 @@ export function CatalogClient({
         onIndexChange={(i) => setGallery((g) => (g ? { ...g, index: i } : g))}
         onClose={() => setGallery(null)}
       />
+
+      {/* Modal detail unit — data dari state client (instan, tanpa fetch baru).
+          Klik foto di modal → lightbox layar penuh di atasnya (z-[70] > z-[60]).
+          Modal dilepas SETELAH animasi keluar selesai (closeDetail). */}
+      {detailTarget && (
+        <VehicleDetailModal
+          vehicle={detailTarget}
+          open={!detailClosing}
+          showroom={
+            data ? { name: data.showroom.name, ownerPhone: data.showroom.ownerPhone } : null
+          }
+          showLocation={hasBranches}
+          suspendEscape={gallery != null}
+          onClose={closeDetail}
+          onHoldExpired={() => refetch(true)}
+          onOpenLightbox={(i) => setGallery({ vehicle: detailTarget, index: i })}
+        />
+      )}
     </>
   )
 }
@@ -578,7 +638,7 @@ function CatalogCard({
   fallbackLocMaps,
   onCopy,
   onHold,
-  onOpenGallery,
+  onOpenDetail,
   onHoldExpired,
 }: {
   v: PublicVehicle
@@ -590,7 +650,8 @@ function CatalogCard({
   fallbackLocMaps: string | null
   onCopy: () => void
   onHold: () => void
-  onOpenGallery: (index: number) => void
+  /** Buka Modal Detail Unit (juga dipicu klik di area kartu manapun). */
+  onOpenDetail: () => void
   onHoldExpired: () => void
 }) {
   const [sharing, setSharing] = useState(false)
@@ -599,6 +660,8 @@ function CatalogCard({
   const isHeld = v.status === 'hold'
   const locName = v.branch?.name || fallbackLocName
   const locMaps = v.branch?.mapsUrl ?? fallbackLocMaps
+  /** Link WA spesifik unit — prefill nama/tahun/harga agar owner mudah membalas. */
+  const unitWaHref = waLink(showroom.ownerPhone, buildUnitInquiryText(v))
 
   /** Bagikan foto utama + caption spek motor via Web Share API (langsung ke WA/medsos). */
   async function handleShare() {
@@ -620,13 +683,20 @@ function CatalogCard({
   }
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      {/* Foto 4:3 */}
+    <article
+      onClick={(e) => {
+        // Klik kartu membuka modal detail — kecuali klik pada tombol/link aksi
+        if ((e.target as HTMLElement | null)?.closest('button, a')) return
+        onOpenDetail()
+      }}
+      className="flex cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+    >
+      {/* Foto 4:3 — klik juga membuka modal detail (galeri layar penuh ada di dalam modal) */}
       <button
         type="button"
-        onClick={() => onOpenGallery(0)}
+        onClick={onOpenDetail}
         className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-100"
-        aria-label={`Lihat foto ${v.brand} ${v.model}`}
+        aria-label={`Lihat detail ${v.brand} ${v.model}`}
       >
         <VehiclePhoto
           src={v.photos[0]}
@@ -732,8 +802,29 @@ function CatalogCard({
         )}
 
         {/* Aksi */}
-        {!isSold && (
+        {!isSold ? (
           <div className="space-y-2">
+            {/* CTA utama pembeli: chat WA spesifik unit + lihat detail (modal) */}
+            <div className="grid grid-cols-2 gap-2">
+              <a
+                href={unitWaHref}
+                target="_blank"
+                rel="noreferrer"
+                title="Chat WhatsApp tentang unit ini"
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-md bg-emerald-700 text-xs font-extrabold text-white transition-colors hover:bg-emerald-800"
+              >
+                <MessageCircle className="h-4 w-4" aria-hidden />
+                Chat WhatsApp
+              </a>
+              <Button
+                variant="outline"
+                className="h-11 border-slate-300 bg-white text-xs font-extrabold text-slate-800 hover:bg-slate-50"
+                onClick={onOpenDetail}
+              >
+                <Info className="mr-1 h-4 w-4" aria-hidden />
+                Lihat Detail
+              </Button>
+            </div>
             {/* Web Share API: foto utama + caption spek motor → langsung ke WA/medsos */}
             <Button
               variant="outline"
@@ -767,6 +858,15 @@ function CatalogCard({
               </Button>
             </div>
           </div>
+        ) : (
+          <Button
+            variant="outline"
+            className="h-11 w-full border-slate-300 bg-white text-xs font-extrabold text-slate-800 hover:bg-slate-50"
+            onClick={onOpenDetail}
+          >
+            <Info className="mr-1 h-4 w-4" aria-hidden />
+            Lihat Detail
+          </Button>
         )}
       </div>
     </article>

@@ -64,6 +64,20 @@ export function waLink(phone: string, text?: string): string {
   return text ? `${base}?text=${encodeURIComponent(text)}` : base
 }
 
+/**
+ * Template pesan WA "tanya unit ini" — dipakai tombol Chat WhatsApp di kartu
+ * katalog & tombol utama di Modal Detail Unit (format konsisten utk owner).
+ */
+export function buildUnitInquiryText(v: {
+  brand: string
+  model: string
+  year: number
+  sellingPrice: number | null
+}): string {
+  const harga = v.sellingPrice != null ? ` seharga ${formatRupiah(v.sellingPrice)}` : ''
+  return `Halo, saya tertarik dengan unit ${v.brand} ${v.model} ${v.year}${harga} di katalog MotoStock. Apakah unit ini masih tersedia?`
+}
+
 /** Pajak dianggap "hidup" kalau teksnya tidak mengandung kata "mati". */
 export function isTaxAlive(tax?: string | null): boolean {
   if (!tax) return true

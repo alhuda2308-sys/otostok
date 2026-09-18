@@ -714,3 +714,25 @@ Stage Summary:
 - Landing konversi: hero gelap modern -> masalah/solusi -> 4 fitur -> pricing 3 tier (Starter 99rb, Pro 199rb POPULER, Enterprise 399rb; tahunan hemat 2 bulan) -> CTA akhir; FCP ringan (server component + 1 client toggle kecil)
 - Nomor WA sales cukup diganti di satu tempat (env NEXT_PUBLIC_SALES_WHATSAPP atau fallback constants)
 - Link demo katalog/login owner memakai slug byan-jaya-motor sesuai brief — pastikan showroom dgn slug tsb ada di produksi
+
+---
+Task ID: unit-detail-modal-katalog
+Agent: main (Z.ai Code)
+Task: Tambah fitur Modal/Popup Detail Unit Interaktif di Katalog Publik (/s/[slug]) + tombol Chat WhatsApp per kartu + push main
+
+Work Log:
+- Komponen baru src/components/vehicle-detail-modal.tsx (client): bottom sheet di mobile (slide-up, handle bar, rounded-t) & center modal di desktop (fade+zoom) via tw-animate-css (animate-in/out, slide-in-from-bottom, fill-mode-forwards)
+- Galeri foto dalam modal: swipe (TouchEvent, ambang 56px, guard suppressClick anti-terbuka saat geser), panah prev/next (desktop), thumbnail strip w/ ring aktif, counter N/M, hint "Ketuk untuk perbesar"; klik foto utama -> PhotoLightbox layar penuh milik parent (z-[70] di atas modal z-[60])
+- Konten modal: pill status (Tersedia/Ter-booking/Terjual), chip kategori, nama+tahun+KM+warna, banner hold w/ Countdown (onDone -> refetch parent), harga OTR + komisi, Simulasi Angsuran (DP 20%, tenor 12/24/36 toggle, bunga flat 1,1%/bln, disclaimer bukan penawaran), grid spesifikasi (Plat/Pajak warna hidup-mati/Transmisi=dari kolom category/Warna/Dokumen/Lokasi cabang+link Maps bila multi-cabang), deskripsi lengkap whitespace-pre-line, CTA "Tanya Unit Ini via WhatsApp" (disembunyikan utk unit terjual, diganti catatan)
+- Template WA terpusat: buildUnitInquiryText() di lib/format.ts — "Halo, saya tertarik dengan unit {brand} {model} {tahun} seharga {harga} di katalog MotoStock. Apakah unit ini masih tersedia?" — dipakai kartu & modal
+- catalog-client.tsx: state detailId (modal derive objek unit TERBARU dari data via useMemo -> konten modal ikut segar saat auto-refresh), detailClosing + timer 320ms (modal dilepas SETELAH animasi keluar; openDetail membatalkan timer utk reopen instan), card: artikel clickable (guard closest('button,a') supaya aksi lain tidak memicu modal), foto kartu kini buka modal, aksi baru per kartu: [Chat WhatsApp](emerald, wa.me spesifik unit) + [Lihat Detail]; unit terjual hanya [Lihat Detail]; onOpenGallery prop kartu dihapus (lightbox kini diakses dari dalam modal)
+- ESC chain fix: listener ESC modal DILEPAS selagi lightbox terbuka (suspendEscape boolean di-eval saat SUBSCRIBE, bukan saat event) — solusi ambiguitas urutan listener window yg berubah saat re-render
+- Lint kesalahan react-hooks/set-state-in-effect & refs diselesaikan lewat arsitektur event-driven (tanpa setState sinkron di effect; galery = child component dgn state sendiri)
+- Perbaikan lingkungan uji: foto seed z-cdn.chatglm.cn memicu crash next/image "unconfigured host" -> scripts/localize-vehicle-images.ts unduh 30 foto ke public/uploads + tulis ulang agent-ctx/vehicle-images.json ke path lokal; re-seed SEED_FORCE=1 (11 unit: 8 ready, 1 hold, 2 terjual, 4 di cabang)
+- E2E agent-browser lolos: modal desktop center + konten scrollable; mobile 390px bottom sheet dgn seluruh info 1 layar; WA href prefill benar (wa.me/6281234567890?text=Halo...); toggle tenor 36bln -> angsuran terhitung ulang; thumbnail & swipe -> 2/3; panah desktop -> pindah foto; ESC-1 tutup lightbox SAJA (modal tetap), ESC-2 tutup modal; klik kartu buka modal; klik backdrop tutup; klik tombol aksi kartu TIDAK memicu modal; body scroll locked saat terbuka & pulih saat tertutup; modal terjual tanpa WA; baris Lokasi Cabang Bekasi + Maps tampil; landing / tetap utuh
+- Lint bersih; tsc 0 error di src/; commit + push main
+
+Stage Summary:
+- Kartu katalog kini punya CTA konversi pembeli (Chat WhatsApp spesifik unit + Lihat Detail) berdampingan dgn alat marketing (Bagikan/Salin/Tahan)
+- Modal detail instan (data dari state client, tanpa fetch) dgn galeri interaktif, simulasi angsuran, spesifikasi lengkap & CTA WA ter-template — bottom sheet di HP, center modal di desktop, animasi halus dua arah
+- Urutan layer: modal z-[60] di atas konten, PhotoLightbox z-[70] di atas modal; ESC menutup satu lapis per tekan
