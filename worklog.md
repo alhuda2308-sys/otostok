@@ -852,3 +852,18 @@ Work Log:
 Stage Summary:
 - Kartu portal kini pola 2-lapis: info di atas (foto+spek) — alat kerja full-width di bawah; di HP tombol besar 40px 2x2 tanpa teks terpotong, di desktop 4 kolom rapi
 - Perubahan terisolasi di partner-client.tsx (95+/83-) — katalog publik & modal tidak disentuh (regresi aman)
+---
+Task ID: portal-iklan-kontak-marketing
+Agent: main (Z.ai Code)
+Task: Revisi generator teks iklan (Salin Iklan + Materi Iklan + Salin Info Lengkap) di Portal Kerja — kontak HANYA marketing aktif, tanpa nomor showroom
+
+Work Log:
+- buildAdText (lib/format.ts): parameter showroom {name,address,ownerPhone} DIGANTI interface AdContact {marketingPhone, storeUrl, locationLine}; penutup lama (Showroom:/Alamat:/Chat WA: nomor owner) DIHAPUS, diganti 4 baris sesuai spec — "Hubungi via WhatsApp: <display 08xx>", "Chat Langsung: https://wa.me/<62xx>", "Lihat Katalog Lengkap: <URL toko>", "Lokasi Unit / Showroom: <lokasi tanpa kontak>"; baris WA dilewati bila nomor kosong
+- shareVehicleAd (lib/share.ts): param showroom diganti AdContact; import PublicShowroomInfo dihapus (caption share ikut format baru)
+- partner-client.tsx: helper adContact(v) — phone = info.phoneNumber ?? marketing.phone (info diambil API dgn header X-Mkt-Phone sesi berjalan → otomatis ikut "Ganti Nomor"; TANPA nama marketing); storeUrl = storeLink() (dibuat absolut: origin || window.location.origin; ?ref=<kode> fallback ?mkt=<id>); locationLine = "nama cabang — alamat" bila unit ada branch, else alamat showroom; handleCopyAd + handleCopyInfo + handleShareAd baru (shareVehicleAd(v, adContact(v))) dipasang ke Salin Iklan / Salin Info Lengkap (modal) / Materi Iklan; prop kartu showroom diganti shareAd (typing ShareAdOutcome)
+- E2E agent-browser (stub clipboard): Salin Iklan unit cabang → "Hubungi via WhatsApp: 0812-9931-2210 | Chat Langsung: https://wa.me/6281299312210 | Lihat Katalog Lengkap: http://localhost:3000/s/showroom-jaya?ref=MKT-PGTSUG | Lokasi Unit / Showroom: Cabang Depok — Jl. Margonda Raya No. 45, Depok, Jawa Barat"; unit tanpa cabang → lokasi = alamat showroom Cakung; Materi Iklan (fallback clipboard headless) → caption 462 char dgn penutup sama + toast; Salin Info Lengkap modal → sama; GANTI NOMOR: keluar Deni → masuk Rina 081200000001 → teks iklan otomatis 0812-0000-0001 / wa.me/6281200000001 / ?ref=MKT-YUKFTF ✓; 0 kemunculan nomor owner 0812-3456-7890 & nama marketing di semua teks; 0 error console
+- Lint bersih; tsc 0 error di src/; katalog publik tidak tersentuh (buildAdText hanya dipakai portal + share.ts)
+
+Stage Summary:
+- Semua materi iklan portal kini menutup dgn kontak rekanan aktif SAJA (WA pribadi + wa.me + link Toko Online personal + lokasi unit/showroom tanpa kontak) — cocok utk diposting marketing tanpa membocorkan nomor owner
+- Binding nomor reaktif: sumber tunggal info.phoneNumber/marketing.phone → Ganti Nomor langsung tercermin di template tanpa cache

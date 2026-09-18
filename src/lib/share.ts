@@ -9,7 +9,8 @@
  */
 
 import { buildAdText, copyToClipboard } from '@/lib/format'
-import type { PublicShowroomInfo, PublicVehicle } from '@/lib/types'
+import type { AdContact } from '@/lib/format'
+import type { PublicVehicle } from '@/lib/types'
 
 export type ShareAdOutcome =
   /** Sheet bagikan native terbuka & selesai (atau user memilih tujuan). */
@@ -65,14 +66,15 @@ async function fetchImageAsFile(url: string, filename: string): Promise<File | n
 
 /**
  * Bagikan materi iklan lewat Web Share API: foto utama + caption spek motor.
+ * Caption memakai kontak marketing aktif (AdContact) — bukan kontak showroom.
  * Urutan percobaan: share file+teks → share teks saja → salin teks ke clipboard.
  * WAJIB dipanggil dari klik tombol (butuh user gesture + secure context).
  */
 export async function shareVehicleAd(
   v: PublicVehicle,
-  showroom: Pick<PublicShowroomInfo, 'name' | 'address' | 'ownerPhone'>,
+  contact: AdContact,
 ): Promise<ShareAdOutcome> {
-  const text = buildAdText(v, showroom)
+  const text = buildAdText(v, contact)
   const title = `${v.brand} ${v.model} (${v.year})`
 
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {

@@ -27,7 +27,7 @@ import {
   formatKm,
   formatRupiah,
 } from '@/lib/format'
-import { shareVehicleAd } from '@/lib/share'
+import { shareVehicleAd, type ShareAdOutcome } from '@/lib/share'
 import {
   clearMarketingSession,
   loadMarketingSession,
@@ -168,12 +168,29 @@ export function PartnerClient({
     setPhase('gate')
   }
 
-  /** Link Toko personal — utamakan ?ref=<kode>, fallback ?mkt=<id>. */
+  /** Link Toko personal — utamakan ?ref=<kode>, fallback ?mkt=<id>.
+   *  Selalu ABSOLUT (ada origin) agar aman dipaste ke chat/iklan. */
   function storeLink(): string {
-    const base = `${origin || ''}/s/${slug}`
+    const base = `${origin || window.location.origin}/s/${slug}`
     if (info?.code) return `${base}?ref=${info.code}`
     if (info?.id) return `${base}?mkt=${info.id}`
     return base
+  }
+
+  /** Kontak penutup iklan — HANYA dari rekanan AKTIF (bukan showroom/owner):
+   *  nomor WA diambil dari data rekanan yang dibuka memakai sesi berjalan
+   *  (header X-Mkt-Phone), sehingga otomatis ikut berubah lewat "Ganti Nomor".
+   *  Lokasi unit = cabang tempat unit berada, atau alamat showroom (tanpa kontak). */
+  function adContact(v: PublicVehicle) {
+    const phone = info?.phoneNumber ?? marketing?.phone ?? ''
+    const location = v.branch
+      ? [v.branch.name, v.branch.address].filter((s) => s && s.trim()).join(' — ')
+      : (data?.showroom.address ?? '')
+    return {
+      marketingPhone: phone,
+      storeUrl: storeLink(),
+      locationLine: location,
+    }
   }
 
   async function handleCopyStoreLink() {
@@ -188,9 +205,14 @@ export function PartnerClient({
 
   async function handleCopyAd(v: PublicVehicle) {
     if (!data) return
-    const ok = await copyToClipboard(buildAdText(v, data.showroom))
+    const ok = await copyToClipboard(buildAdText(v, adContact(v)))
     if (ok) toast.success('Teks promosi disalin! Tinggal paste ke WA Status / Marketplace.')
     else toast.error('Gagal menyalin. Coba lagi.')
+  }
+
+  /** Materi Iklan dari kartu — caption memakai kontak rekanan aktif. */
+  function handleShareAd(v: PublicVehicle): Promise<ShareAdOutcome> {
+    return shareVehicleAd(v, adContact(v))
   }
 
   /** Buka modal detail — batalkan animasi keluar yang masih berjalan (bila ada). */
@@ -234,7 +256,7 @@ export function PartnerClient({
   /** Salin info lengkap unit dari dalam modal utk dipaste ke chat calon pembeli. */
   async function handleCopyInfo(v: PublicVehicle) {
     if (!data) return
-    const ok = await copyToClipboard(buildAdText(v, data.showroom))
+    const ok = await copyToClipboard(buildAdText(v, adContact(v)))
     if (ok) toast.success('Info lengkap unit disalin — paste ke chat calon pembeli.')
     else toast.error('Gagal menyalin. Coba lagi.')
   }
@@ -387,7 +409,7 @@ export function PartnerClient({
             <PartnerVehicleCard
               key={v.id}
               v={v}
-              showroom={data.showroom}
+              shareAd={handleShareAd}
               onHold={() => setHoldTarget(v)}
               onCopyAd={() => handleCopyAd(v)}
               onOpenDetail={() => openDetail(v.id)}
@@ -445,14 +467,15 @@ export function PartnerClient({
 /** Kartu unit versi PORTAL — alat kerja marketing (bukan tampilan pembeli). */
 function PartnerVehicleCard({
   v,
-  showroom,
+  shareAd,
   onHold,
   onCopyAd,
   onOpenDetail,
   onHoldExpired,
 }: {
   v: PublicVehicle
-  showroom: { name: string; address: string; ownerPhone: string }
+  /** Bagikan materi iklan — caption dibangun di parent dgn kontak rekanan aktif. */
+  shareAd: (v: PublicVehicle) => Promise<ShareAdOutcome>
   onHold: () => void
   onCopyAd: () => void
   /** Buka Modal Detail Unit (dari tombol Lihat Detail / klik foto). */
@@ -467,7 +490,7 @@ function PartnerVehicleCard({
   async function handleShare() {
     setSharing(true)
     try {
-      const outcome = await shareVehicleAd(v, showroom)
+      const outcome = await shareAd(v)
       if (outcome === 'shared') {
         toast.success('Menu bagikan terbuka — pilih WhatsApp / media sosial tujuan.')
       } else if (outcome === 'copied') {

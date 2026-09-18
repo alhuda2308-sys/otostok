@@ -147,13 +147,29 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-/** Susun teks iklan siap-posting untuk WhatsApp Status / Facebook Marketplace. */
+/**
+ * Kontak pemasaran untuk penutup teks iklan Portal Kerja.
+ * ATURAN: HANYA kontak rekanan marketing aktif (nomor WA pribadi + link toko
+ * personal) — TANPA nama marketing, TANPA nomor WhatsApp showroom/owner.
+ * Nomor diambil dari sesi aktif sehingga otomatis ikut "Ganti Nomor".
+ */
+export interface AdContact {
+  /** Nomor WhatsApp marketing aktif (08xx / 62xx — dinormalisasi otomatis). */
+  marketingPhone: string
+  /** URL toko online marketing lengkap (absolut), mis. https://host/s/slug?ref=MKT-XX. */
+  storeUrl: string
+  /** Baris lokasi unit: nama/alamat cabang atau alamat showroom — TANPA kontak. */
+  locationLine: string
+}
+
+/** Susun teks iklan siap-posting untuk WhatsApp Status / Facebook Marketplace.
+ *  Penutup HANYA memakai kontak marketing aktif (lihat AdContact) — bukan showroom. */
 export function buildAdText(
   v: Pick<
     PublicVehicleLike,
     'brand' | 'model' | 'year' | 'licensePlate' | 'odometer' | 'color' | 'taxStatus' | 'documentStatus' | 'sellingPrice' | 'notes'
   >,
-  showroom: { name: string; address: string; ownerPhone: string },
+  contact: AdContact,
 ): string {
   const lines: string[] = []
   lines.push(`DIJUAL — ${v.brand} ${v.model} (${v.year})`)
@@ -170,9 +186,12 @@ export function buildAdText(
     lines.push(v.notes)
   }
   lines.push('')
-  lines.push(`Showroom: ${showroom.name}`)
-  if (showroom.address) lines.push(`Alamat: ${showroom.address}`)
-  lines.push(`Chat WA: ${formatPhoneDisplay(showroom.ownerPhone)}`)
+  if (contact.marketingPhone) {
+    lines.push(`Hubungi via WhatsApp: ${formatPhoneDisplay(contact.marketingPhone)}`)
+    lines.push(`Chat Langsung: https://wa.me/${normalizePhone(contact.marketingPhone)}`)
+  }
+  if (contact.storeUrl) lines.push(`Lihat Katalog Lengkap: ${contact.storeUrl}`)
+  if (contact.locationLine) lines.push(`Lokasi Unit / Showroom: ${contact.locationLine}`)
   return lines.join('\n')
 }
 
