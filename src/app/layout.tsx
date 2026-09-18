@@ -34,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="id" suppressHydrationWarning>
+    <html lang="id" className="scroll-smooth" suppressHydrationWarning>
       <body className="bg-slate-50 font-sans text-slate-900 antialiased">
         <div className="flex min-h-screen flex-col">
           <QueryProvider>{children}</QueryProvider>

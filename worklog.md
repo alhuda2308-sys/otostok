@@ -696,3 +696,21 @@ Work Log:
 Stage Summary:
 - Main GitHub kini berisi seluruh perf work + rebranding MotoStock; deploy Vercel otomatis berjalan
 - Komit rebranding final: 1ad35f1 (25 file)
+
+---
+Task ID: landing-promo-modern-pricing
+Agent: main (Z.ai Code)
+Task: Ubah / menjadi Landing Page Promo Modern & Konversi Tinggi + Pricing Section utk MotoStock
+
+Work Log:
+- Konstanta WA terpusat: SALES_WHATSAPP di lib/constants.ts (env NEXT_PUBLIC_SALES_WHATSAPP, fallback 6281234567890) + dokumentasi di .env.example; semua link wa.me dibangun server-side via waLink() lalu dikirim sbg props ke client component
+- File baru src/app/pricing-section.tsx (client component MINIMALIS — satu-satunya interaktivitas): toggle Bulanan/Tahunan (aria-pressed), 3 kartu paket, chip Hemat otomatis (monthly*12 - yearly), badge PALING POPULER + highlight ring pada Pro, footer "Sudah punya kode lisensi? Aktivasi Sekarang" -> /activate
+- page.tsx ditulis ulang sbg pure server component: navbar sticky gelap (brand, Fitur #fitur, Harga #harga, Contoh Katalog /s/byan-jaya-motor, Login Owner /admin/byan-jaya-motor, Aktivasi Lisensi) + baris pill utk mobile tanpa JS; hero gelap dgn headline/subheadline persis sesuai brief + 2 CTA + mockup katalog CSS murni (tanpa gambar); seksi Masalah vs Solusi (4 poin) + grid 4 kartu fitur sesuai teks user; shell harga; CTA akhir gelap
+- Hapus catalog-lookup-form.tsx (pemakai tunggal page lama); layout.tsx + scroll-smooth utk anchor nav
+- Insiden sandbox reset di tengah sesi: refs lokal ter-rewind ke snapshot lama sementara working tree berisi kode hasil rebase -> commit sementara ikut men-swap file drift (upload/route.ts versi lama, 5 jpg tes public/uploads, tool-results terhapus, mode file berubah). PENANGANAN: git reset --hard ke d11137f (remote), checkout ulang 2 file landing dari commit drift, terapkan ulang 5 perubahan kecil secara manual, commit bersih dgn path eksplisit (tanpa add -A) -> diff vs remote dijamin hanya 7 file landing
+- Verifikasi pra-reset (konten identik dgn versi final): lint bersih; tsc 0 error di src/; agent-browser — 5 link WA berprefill benar (Starter/Pro/Enterprise/konsultasi), 3x /s/byan-jaya-motor, 2x /admin/byan-jaya-motor, 3x /activate; toggle Tahunan -> Rp990.000/Rp1.990.000/Rp3.990.000 /tahun + chip hemat 198rb/398rb/798rb; badge & footer pricing tampil; mobile 390px tanpa scroll horizontal; 0 error console & dev.log
+
+Stage Summary:
+- Landing konversi: hero gelap modern -> masalah/solusi -> 4 fitur -> pricing 3 tier (Starter 99rb, Pro 199rb POPULER, Enterprise 399rb; tahunan hemat 2 bulan) -> CTA akhir; FCP ringan (server component + 1 client toggle kecil)
+- Nomor WA sales cukup diganti di satu tempat (env NEXT_PUBLIC_SALES_WHATSAPP atau fallback constants)
+- Link demo katalog/login owner memakai slug byan-jaya-motor sesuai brief — pastikan showroom dgn slug tsb ada di produksi

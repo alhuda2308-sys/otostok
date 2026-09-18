@@ -3,6 +3,14 @@ import type { VehicleStatus } from './types'
 /** Durasi tahanan unit (jam). */
 export const HOLD_HOURS = 2
 
+/**
+ * Nomor WhatsApp Sales MotoStock — terpusat untuk semua CTA landing page
+ * (hero, kartu harga, CTA akhir). Override via env NEXT_PUBLIC_SALES_WHATSAPP
+ * (format internasional tanpa "+", mis. 62812345678xx).
+ */
+export const SALES_WHATSAPP =
+  process.env.NEXT_PUBLIC_SALES_WHATSAPP?.replace(/\D/g, '') || '6281234567890'
+
 export const DOCUMENT_OPTIONS = [
   'STNK & BPKB Lengkap',
   'STNK Saja (BPKB Kreditsi)',
