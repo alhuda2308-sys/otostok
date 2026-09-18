@@ -798,3 +798,23 @@ Stage Summary:
 - Root cause: overflow-hidden memotong kolom kanan tabel (bukan bug data/API)
 - Pola responsif final: <1024px kartu grid 2 kolom (semua tombol) → 1024–1279px tabel 8 kolom fit → ≥1280px tabel 9 kolom penuh; overflow-x-auto sbg jaring pengaman — tabel tidak pernah memotong tombol lagi
 - Pembelajaran: table-cell max-width tidak reliabel di auto layout → wajib table-fixed + lebar th eksplisit utk tabel kolom-banyak di container sempit
+
+---
+Task ID: katalog-publik-bersih-portal-kerja
+Agent: main (Z.ai Code)
+Task: Perbaiki navigasi katalog owner & pisahkan hak akses fitur marketing (katalog publik vs portal kerja)
+
+Work Log:
+- Katalog publik dibersihkan jadi tampilan pembeli murni: hapus tombol "Tahan Unit", "Bagikan Materi Iklan", "Salin Iklan" dari CatalogCard + HapusDialog/HoldDialog dari katalog + tampilan "Komisi" dari kartu & modal detail (info internal). Sisa CTA: Chat WhatsApp + Lihat Detail (+ banner hold pembeli tetap)
+- ?owner=1 baru di katalog: dipaksa mode Owner — param ?ref/?mkt DIABAIKAN, atribusi tersimpan (otostok_ref_<slug>) DIBERSIHKAN, banner sapaan rekanan disembunyikan; semua WA → nomor resmi showroom dgn template resmi. Gerbang whitelist TETAP aktif (tanpa bypass publik)
+- Portal Kerja BARU /s/[slug]/partner (server page + partner-client.tsx): identitas HANYA via gerbang verifikasi WA (MarketingGate dipakai ulang dgn props contextLabel="Portal Kerja"/submitLabel="Masuk Portal" — TIDAK percaya ?ref= publik); berisi kartu "Toko Online Saya" (link /s/[slug]?ref=<kode> fallback ?mkt=<id> + Salin Link Toko + Buka Toko Saya) + daftar unit dgn alat kerja lengkap (Tahan Unit/HoldDialog, Materi Iklan/Web Share, Salin Teks Promosi) + komisi tampil + auto-refresh 30 dtk + Ganti Nomor
+- API BARU GET /api/showrooms/[slug]/partner: info rekanan via header X-Mkt-Phone (403 PARTNER_REQUIRED bila tak terdaftar/aktif); menyerahkan kode referral utk kartu Toko Online Saya
+- Dashboard marketings: tombol per rekanan diganti 3 tombol — "Link Toko Publik" (buka /s/[slug]?ref=KODE tab baru) + "Link Portal Kerja" (buka /s/[slug]/partner tab baru) + "Kirim Link via WA" (tetap); kartu utama owner "Buka Katalog" → /s/[slug]?owner=1, "Salin Link Katalog" tetap salin /s/[slug] MURNI; bullet info baru ttg Portal Kerja
+- Dashboard home: "Lihat Katalog" → /s/[slug]?owner=1
+- E2E agent-browser: katalog ?ref= → 0 tombol internal, 10 WA ke mitra + template mitra, atribusi tersimpan; ?owner=1 → atribusi DIBERSIHKAN, badge hilang, 10 WA ke nomor resmi 6281234567890 + template owner (kartu "Halo Showroom Jaya Motor, saya tertarik dengan unit... katalog resmi MotoStock Anda..."); portal → gate dgn konteks Portal, verifikasi Deni → Toko Online Saya MKT-PGTSUG + alat kerja; hold end-to-end sukses (banner "Ditahan oleh Deni Prasetyo", badge HOLD); isolasi identitas: portal ?ref=MKT-YUKFTF (Rina) tetap menampilkan Deni; salin link toko toast sukses; dashboard: Buka Katalog=?owner=1, 3x Link Toko Publik (ref per rekanan), 3x Link Portal Kerja, Salin Link Katalog = http://localhost:3000/s/showroom-jaya MURNI (dicek dgn stub clipboard); URL polos pasca ?owner=1 tetap mode owner; portal sesi kosong → gerbang; mobile 390px tanpa h-scroll/tombol terpotong; 0 error console
+- Lint bersih; tsc 0 error di src/
+
+Stage Summary:
+- Pemisahan hak akses tegas: KATALOG PUBLIK = pembeli (WA routing owner/mitra via ?ref, tanpa alat kerja, tanpa komisi) vs PORTAL KERJA = marketing (verifikasi WA, alat hold/iklan, kartu Toko Online Saya)
+- Owner dashboard kini membuka katalog dgn mode bersih terjamin (?owner=1 membersihkan atribusi tersimpan di browser) & menyalin URL murni /s/[slug]
+- Keamanan portal: identitas hanya dari sesi verifikasi WA — link toko publik (?ref) TIDAK bisa membuka alat operasional marketing

@@ -256,7 +256,7 @@ function Dashboard({
               size="sm"
               className="h-9 bg-blue-700 text-xs font-bold hover:bg-blue-800"
             >
-              <Link href={`/s/${slug}`} target="_blank">
+              <Link href={`/s/${slug}?owner=1`} target="_blank">
                 Lihat Katalog
               </Link>
             </Button>

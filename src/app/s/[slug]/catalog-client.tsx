@@ -5,18 +5,13 @@ import { toast } from 'sonner'
 import {
   BadgeCheck,
   Camera,
-  ClipboardCopy,
   ExternalLink,
   Info,
-  Loader2,
-  Lock,
   MapPin,
   MessageCircle,
   Search,
-  Share2,
 } from 'lucide-react'
 import { Countdown } from '@/components/countdown'
-import { HoldDialog } from '@/components/hold-dialog'
 import { MarketingGate } from '@/components/marketing-gate'
 import { PhotoLightbox } from '@/components/photo-lightbox'
 import { StatusBadge } from '@/components/status-badge'
@@ -25,17 +20,14 @@ import { VehiclePhoto } from '@/components/vehicle-photo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  buildAdText,
   buildCatalogGreetingText,
   buildUnitInquiryText,
-  copyToClipboard,
   formatDateTimeID,
   formatKm,
   formatRupiah,
   isTaxAlive,
   waLink,
 } from '@/lib/format'
-import { shareVehicleAd } from '@/lib/share'
 import {
   clearMarketingSession,
   loadMarketingSession,
@@ -82,15 +74,18 @@ export function CatalogClient({
   // Katalog Digital Multi-Mitra: atribusi referral "Link Toko" marketing.
   // Aktif bila URL punya ?ref=<kode>/?mkt=<id> yang valid, atau visitor pernah
   // membuka link toko tsb sebelumnya (tersimpan di localStorage per showroom).
+  // DIKECUALIKAN saat ?owner=1: katalog dipaksa mode Owner bersih — atribusi
+  // tersimpan dibersihkan (dipakai tombol "Lihat/Buka Katalog" dashboard owner).
   const [referral, setReferral] = useState<ReferralSession | null>(null)
   const referralRef = useRef<ReferralSession | null>(null)
+  /** true = dibuka via dashboard owner (?owner=1) — tanpa UI atribusi mitra. */
+  const [ownerView, setOwnerView] = useState(false)
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [brandFilter, setBrandFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [branchFilter, setBranchFilter] = useState<string>('all') // all | main | branchId
   const [q, setQ] = useState('')
-  const [holdTarget, setHoldTarget] = useState<PublicVehicle | null>(null)
   const [gallery, setGallery] = useState<{ vehicle: PublicVehicle; index: number } | null>(null)
   /** ID unit yang modal detailnya terbuka — objek unit DIDERIVASI dari data terbaru,
    *  sehingga konten modal ikut segar saat auto-refresh (mis. hold kedaluwarsa → Ready). */
@@ -147,20 +142,35 @@ export function CatalogClient({
     // Resolusi referral Personal Store (?ref=/?mkt=) dulu, lalu muat katalog —
     // supaya kredensial X-Mkt-Phone sudah tersedia sebelum fetch pertama
     // (showroom whitelist tetap terbuka lewat link toko marketing).
+    //
+    // ?owner=1 (dari dashboard owner): ABAIKAN semua atribusi — bersihkan
+    // referral tersimpan supaya browser kembali murni mode Owner (seluruh
+    // tombol WA mengarah ke nomor resmi showroom).
     let alive = true
     ;(async () => {
-      const param = readReferralParam()
-      let ref: ReferralSession | null = null
-      if (param) {
-        ref = await resolveReferral(slug, param)
-        if (ref) saveReferralSession(slug, ref)
-        else ref = loadReferralSession(slug) // param tak valid → pakai atribusi tersimpan
+      const ownerParam =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('owner') === '1'
+      if (ownerParam) {
+        clearReferralSession(slug)
+        referralRef.current = null
+        setReferral(null)
+        setOwnerView(true)
       } else {
-        ref = loadReferralSession(slug)
+        const param = readReferralParam()
+        let ref: ReferralSession | null = null
+        if (param) {
+          ref = await resolveReferral(slug, param)
+          if (ref) saveReferralSession(slug, ref)
+          else ref = loadReferralSession(slug) // param tak valid → pakai atribusi tersimpan
+        } else {
+          ref = loadReferralSession(slug)
+        }
+        if (!alive) return
+        referralRef.current = ref
+        setReferral(ref)
       }
       if (!alive) return
-      referralRef.current = ref
-      setReferral(ref)
 
       // Baca sesi rekanan dari localStorage — marketing tidak perlu mengetik ulang nomor
       const cached = loadMarketingSession(slug)
@@ -265,13 +275,6 @@ export function CatalogClient({
         .includes(query)
     })
   }, [data, statusFilter, brandFilter, categoryFilter, branchFilter, q])
-
-  async function handleCopy(v: PublicVehicle) {
-    if (!data) return
-    const ok = await copyToClipboard(buildAdText(v, data.showroom))
-    if (ok) toast.success('Iklan disalin! Tinggal paste ke WhatsApp Status / Marketplace.')
-    else toast.error('Gagal menyalin. Coba lagi.')
-  }
 
   /** Verifikasi rekanan sukses — simpan sesi di localStorage lalu buka katalog. */
   function handleVerified(s: MarketingSession) {
@@ -414,8 +417,9 @@ export function CatalogClient({
           </div>
         )}
         {/* Sapaan personal rekanan — hanya bila showroom memakai whitelist
-            (tanpa atribusi referral; mode Personal Store memakai banner mitra di atas) */}
-        {marketing && !referral && (
+            (tanpa atribusi referral & bukan mode owner; mode Personal Store
+            memakai banner mitra di atas) */}
+        {marketing && !referral && !ownerView && (
           <div className="mx-auto w-full max-w-5xl border-t border-slate-200 bg-blue-50">
             <div className="flex h-10 items-center justify-between gap-2 px-4">
               <p className="truncate text-xs font-extrabold text-blue-900">
@@ -661,8 +665,6 @@ export function CatalogClient({
                 fallbackLocMaps={showroom?.mapsUrl ?? null}
                 waPhone={referral?.phone ?? data.showroom.ownerPhone}
                 marketingName={referral?.fullName ?? null}
-                onCopy={() => handleCopy(v)}
-                onHold={() => setHoldTarget(v)}
                 onOpenDetail={() => openDetail(v.id)}
                 onHoldExpired={() => refetch(true)}
               />
@@ -670,15 +672,6 @@ export function CatalogClient({
           </div>
         )}
       </div>
-
-      {/* Dialog hold — mode rekanan (konfirmasi identitas otomatis) / mode manual */}
-      <HoldDialog
-        vehicle={holdTarget}
-        open={holdTarget != null}
-        onOpenChange={(o) => !o && setHoldTarget(null)}
-        onSuccess={() => refetch(true)}
-        session={marketing}
-      />
 
       {/* Galeri foto LAYAR PENUH — geser kanan/kiri, simpan foto tunggal per slide */}
       <PhotoLightbox
@@ -726,13 +719,11 @@ function CatalogCard({
   fallbackLocMaps,
   waPhone,
   marketingName,
-  onCopy,
-  onHold,
   onOpenDetail,
   onHoldExpired,
 }: {
   v: PublicVehicle
-  /** Data showroom untuk caption materi iklan (Web Share API). */
+  /** Data showroom — nama dipakai template pertanyaan WA pembeli. */
   showroom: { name: string; address: string; ownerPhone: string }
   /** True hanya bila showroom punya cabang (multi-lokasi). */
   showLocation: boolean
@@ -742,13 +733,10 @@ function CatalogCard({
   waPhone: string
   /** Terisi = mode Personal Store → template pesan mitra. */
   marketingName: string | null
-  onCopy: () => void
-  onHold: () => void
   /** Buka Modal Detail Unit (juga dipicu klik di area kartu manapun). */
   onOpenDetail: () => void
   onHoldExpired: () => void
 }) {
-  const [sharing, setSharing] = useState(false)
   const taxAlive = isTaxAlive(v.taxStatus)
   const isSold = v.status === 'sold'
   const isHeld = v.status === 'hold'
@@ -762,25 +750,6 @@ function CatalogCard({
       marketingName,
     }),
   )
-
-  /** Bagikan foto utama + caption spek motor via Web Share API (langsung ke WA/medsos). */
-  async function handleShare() {
-    setSharing(true)
-    try {
-      const outcome = await shareVehicleAd(v, showroom)
-      if (outcome === 'shared') {
-        toast.success('Menu bagikan terbuka — pilih WhatsApp / media sosial tujuan.')
-      } else if (outcome === 'copied') {
-        toast.info(
-          'Perangkat ini belum mendukung kirim foto otomatis. Caption iklan sudah disalin — tinggal lampirkan foto.',
-        )
-      } else if (outcome === 'failed') {
-        toast.error('Gagal menyiapkan materi iklan. Coba lagi.')
-      }
-    } finally {
-      setSharing(false)
-    }
-  }
 
   return (
     <article
@@ -881,11 +850,6 @@ function CatalogCard({
           <p className="text-xl font-extrabold tracking-tight text-slate-900">
             {formatRupiah(v.sellingPrice)}
           </p>
-          {v.commissionAmount != null && !isSold && (
-            <p className="text-xs font-extrabold text-emerald-700">
-              Komisi: {formatRupiah(v.commissionAmount)}
-            </p>
-          )}
         </div>
 
         {isHeld && v.activeHold && (
@@ -901,62 +865,29 @@ function CatalogCard({
           </div>
         )}
 
-        {/* Aksi */}
+        {/* Aksi — KATALOG PUBLIK = tampilan pembeli: hanya chat WA + lihat detail.
+            Alat operasional marketing (Tahan Unit / Materi Iklan / Salin Iklan)
+            dipindah ke Portal Kerja: /s/[slug]/partner */}
         {!isSold ? (
-          <div className="space-y-2">
-            {/* CTA utama pembeli: chat WA spesifik unit + lihat detail (modal) */}
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href={unitWaHref}
-                target="_blank"
-                rel="noreferrer"
-                title="Chat WhatsApp tentang unit ini"
-                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-md bg-emerald-700 text-xs font-extrabold text-white transition-colors hover:bg-emerald-800"
-              >
-                <MessageCircle className="h-4 w-4" aria-hidden />
-                Chat WhatsApp
-              </a>
-              <Button
-                variant="outline"
-                className="h-11 border-slate-300 bg-white text-xs font-extrabold text-slate-800 hover:bg-slate-50"
-                onClick={onOpenDetail}
-              >
-                <Info className="mr-1 h-4 w-4" aria-hidden />
-                Lihat Detail
-              </Button>
-            </div>
-            {/* Web Share API: foto utama + caption spek motor → langsung ke WA/medsos */}
+          <div className="grid grid-cols-2 gap-2">
+            <a
+              href={unitWaHref}
+              target="_blank"
+              rel="noreferrer"
+              title="Chat WhatsApp tentang unit ini"
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-md bg-emerald-700 text-xs font-extrabold text-white transition-colors hover:bg-emerald-800"
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden />
+              Chat WhatsApp
+            </a>
             <Button
               variant="outline"
-              className="h-11 w-full border-blue-200 bg-blue-50 text-xs font-extrabold text-blue-800 hover:bg-blue-100"
-              onClick={handleShare}
-              disabled={sharing}
+              className="h-11 border-slate-300 bg-white text-xs font-extrabold text-slate-800 hover:bg-slate-50"
+              onClick={onOpenDetail}
             >
-              {sharing ? (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden />
-              ) : (
-                <Share2 className="mr-1 h-4 w-4" aria-hidden />
-              )}
-              Bagikan Materi Iklan
+              <Info className="mr-1 h-4 w-4" aria-hidden />
+              Lihat Detail
             </Button>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                className="h-11 border-slate-300 bg-white text-xs font-extrabold text-blue-800 hover:bg-blue-50"
-                onClick={onCopy}
-              >
-                <ClipboardCopy className="mr-1 h-4 w-4" /> Salin Iklan
-              </Button>
-              <Button
-                className="h-11 bg-blue-700 text-xs font-extrabold hover:bg-blue-800"
-                disabled={isHeld}
-                onClick={onHold}
-                title={isHeld ? 'Unit sedang ditahan marketing lain' : undefined}
-              >
-                <Lock className="mr-1 h-4 w-4" />
-                {isHeld ? 'Ditahan' : 'Tahan Unit'}
-              </Button>
-            </div>
           </div>
         ) : (
           <Button

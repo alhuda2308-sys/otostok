@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
+  Briefcase,
   Copy,
   ExternalLink,
   FileImage,
   IdCard,
-  Link2,
   Lock,
   Megaphone,
   MessageCircle,
@@ -276,16 +276,9 @@ function MarketingsPage({
     return m.code ? `${base}?ref=${m.code}` : `${base}?mkt=${m.id}`
   }
 
-  async function handleCopyStoreLink(m: MarketingPartner) {
-    if (!origin) return toast.error('Menyiapkan link... coba sesaat lagi.')
-    const ok = await copyToClipboard(buildStoreLink(m))
-    if (ok) {
-      toast.success(
-        `Link Toko ${m.fullName} disalin — bagikan ke pembeli; semua chat masuk ke WA-nya.`,
-      )
-    } else {
-      toast.error('Gagal menyalin. Coba lagi.')
-    }
+  /** Portal Kerja marketing — halaman internal alat kerja (identitas via gerbang WA). */
+  function partnerPortalLink(): string {
+    return `/s/${slug}/partner`
   }
 
   async function handleCopyMainLink() {
@@ -336,7 +329,8 @@ function MarketingsPage({
                 </h3>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
                   Link resmi katalog tanpa perantara marketing — semua chat WhatsApp pembeli
-                  langsung masuk ke nomor resmi showroom.
+                  langsung masuk ke nomor resmi showroom. Dibuka dalam mode Owner bersih
+                  (atribusi mitra tersimpan di browser otomatis dibersihkan).
                 </p>
                 <p
                   dir="ltr"
@@ -358,7 +352,7 @@ function MarketingsPage({
                 asChild
                 className="h-10 border-slate-300 px-3 text-xs font-extrabold"
               >
-                <a href={`/s/${slug}`} target="_blank" rel="noreferrer">
+                <a href={`/s/${slug}?owner=1`} target="_blank" rel="noreferrer">
                   <ExternalLink className="mr-1 h-3.5 w-3.5" /> Buka Katalog
                 </a>
               </Button>
@@ -385,6 +379,12 @@ function MarketingsPage({
               Bagikan <span className="font-bold">Link Toko</span> per rekanan — pembeli yang
               membukanya melihat katalog dgn nama mitra &amp; semua tombol WA mengarah ke nomor
               mitra (Personal Store).
+            </li>
+            <li>
+              <span className="font-bold">Portal Kerja</span> (
+              <code>/s/{slug}/partner</code>) — halaman internal alat marketing (Tahan Unit,
+              Materi Iklan, Salin Teks Promosi, Toko Online Saya). Katalog publik kini bersih
+              dari alat kerja — hanya tampilan pembeli.
             </li>
           </ul>
         </div>
@@ -515,14 +515,37 @@ function MarketingsPage({
                       </td>
                       <td className="px-2 py-3">
                         <div className="flex flex-col items-start gap-1">
+                          {/* Buka katalog publik BERSIH dgn referral mitra ini (tab baru) */}
                           <Button
                             variant="outline"
                             size="sm"
                             className="h-8 border-slate-300 px-2 text-[11px] font-extrabold"
-                            onClick={() => handleCopyStoreLink(m)}
-                            title={`Salin link katalog referral ${m.fullName}`}
+                            asChild
                           >
-                            <Link2 className="mr-1 h-3.5 w-3.5" /> Salin Link Toko
+                            <a
+                              href={buildStoreLink(m)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`Buka katalog publik dengan referral ${m.fullName}`}
+                            >
+                              <Store className="mr-1 h-3.5 w-3.5" /> Link Toko Publik
+                            </a>
+                          </Button>
+                          {/* Portal Kerja — halaman internal alat marketing (tab baru) */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-slate-300 px-2 text-[11px] font-extrabold"
+                            asChild
+                          >
+                            <a
+                              href={partnerPortalLink()}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`Buka Portal Kerja marketing untuk ${m.fullName}`}
+                            >
+                              <Briefcase className="mr-1 h-3.5 w-3.5" /> Link Portal Kerja
+                            </a>
                           </Button>
                           <Button
                             variant="outline"
@@ -654,18 +677,41 @@ function MarketingsPage({
                     </div>
                   )}
 
-                  {/* Link Toko personal — salin utk dibagikan pembeli / kirim via WA ke mitra */}
+                  {/* Link toko: buka katalog publik dgn referral / portal kerja (tab baru) */}
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <Button
                       variant="outline"
                       className="h-10 border-slate-300 text-xs font-extrabold"
-                      onClick={() => handleCopyStoreLink(m)}
+                      asChild
                     >
-                      <Link2 className="mr-1 h-3.5 w-3.5" /> Salin Link Toko
+                      <a
+                        href={buildStoreLink(m)}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`Buka katalog publik dengan referral ${m.fullName}`}
+                      >
+                        <Store className="mr-1 h-3.5 w-3.5" /> Toko Publik
+                      </a>
                     </Button>
                     <Button
                       variant="outline"
-                      className="h-10 border-emerald-200 bg-emerald-50 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100"
+                      className="h-10 border-slate-300 text-xs font-extrabold"
+                      asChild
+                    >
+                      <a
+                        href={partnerPortalLink()}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`Buka Portal Kerja marketing untuk ${m.fullName}`}
+                      >
+                        <Briefcase className="mr-1 h-3.5 w-3.5" /> Portal Kerja
+                      </a>
+                    </Button>
+                  </div>
+                  <div className="mt-2">
+                    <Button
+                      variant="outline"
+                      className="h-10 w-full border-emerald-200 bg-emerald-50 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100"
                       asChild
                     >
                       <a href={sendStoreLinkViaWa(m)} target="_blank" rel="noreferrer">

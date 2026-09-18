@@ -226,11 +226,8 @@ export function VehicleDetailModal({
             <p className="mt-0.5 text-2xl font-extrabold tracking-tight text-slate-900">
               {formatRupiah(vehicle.sellingPrice)}
             </p>
-            {vehicle.commissionAmount != null && !isSold && (
-              <p className="mt-0.5 text-xs font-extrabold text-emerald-700">
-                Komisi marketing: {formatRupiah(vehicle.commissionAmount)}
-              </p>
-            )}
+            {/* Komisi marketing SENGAJA tidak ditampilkan di katalog publik —
+                informasi internal ada di Portal Kerja marketing (/s/[slug]/partner) */}
 
             {installment && vehicle.sellingPrice != null && (
               <div className="mt-3 border-t border-dashed border-slate-300 pt-3">

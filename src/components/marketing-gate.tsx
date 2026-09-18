@@ -19,6 +19,10 @@ interface MarketingGateProps {
   slug: string
   /** Dipanggil setelah verifikasi sukses — parent menyimpan sesi & membuka katalog. */
   onVerified: (s: MarketingSession) => void
+  /** Judul konteks verifikasi — default "Katalog" (dipakai Portal Kerja: "Portal"). */
+  contextLabel?: string
+  /** Label tombol submit — default "Masuk Katalog". */
+  submitLabel?: string
 }
 
 /**
@@ -29,7 +33,12 @@ interface MarketingGateProps {
  * - Nomor terdaftar & aktif  -> onVerified (katalog terbuka, sesi disimpan di localStorage)
  * - Belum terdaftar / nonaktif -> pesan + tombol besar "Hubungi Owner / Admin via WA"
  */
-export function MarketingGate({ slug, onVerified }: MarketingGateProps) {
+export function MarketingGate({
+  slug,
+  onVerified,
+  contextLabel = 'Katalog',
+  submitLabel = 'Masuk Katalog',
+}: MarketingGateProps) {
   const [showroom, setShowroom] = useState<ShowroomLite | null>(null)
   const [showroomError, setShowroomError] = useState(false)
   const [phone, setPhone] = useState('')
@@ -180,7 +189,7 @@ export function MarketingGate({ slug, onVerified }: MarketingGateProps) {
           </h1>
           <p className="mt-1 flex items-center justify-center gap-1 text-xs font-bold text-blue-700">
             <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
-            Katalog Khusus Rekanan Terdaftar
+            {contextLabel} Khusus Rekanan Terdaftar
           </p>
         </div>
 
@@ -215,7 +224,7 @@ export function MarketingGate({ slug, onVerified }: MarketingGateProps) {
               </>
             ) : (
               <>
-                <BadgeCheck className="mr-1.5 h-4 w-4" /> Masuk Katalog
+                <BadgeCheck className="mr-1.5 h-4 w-4" /> {submitLabel}
               </>
             )}
           </Button>
