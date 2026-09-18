@@ -220,22 +220,22 @@ function Dashboard({
     <>
       {/* Header */}
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 px-4">
-          <div className="flex min-w-0 items-center gap-2.5">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:h-20 lg:px-10">
+          <div className="flex min-w-0 items-center gap-2.5 lg:gap-3.5">
             {data?.showroom.logoUrl ? (
               <img
                 src={data.showroom.logoUrl}
                 alt={`Logo ${data.showroom.name}`}
-                className="h-8 w-8 shrink-0 rounded-md object-cover ring-1 ring-slate-200"
+                className="h-9 w-9 shrink-0 rounded-md object-cover ring-1 ring-slate-200 lg:h-12 lg:w-12 lg:rounded-xl"
               />
             ) : (
-              <AppIcon className="h-8 w-8 shrink-0" />
+              <AppIcon className="h-9 w-9 shrink-0 lg:h-12 lg:w-12" />
             )}
             <div className="min-w-0 leading-tight">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 lg:text-xs">
                 {isOwner ? 'Dashboard Owner' : 'Dashboard Admin'}
               </p>
-              <h1 className="truncate text-sm font-extrabold text-slate-900">
+              <h1 className="truncate text-sm font-extrabold text-slate-900 sm:text-base lg:text-2xl">
                 {data?.showroom.name ?? 'Memuat...'}
               </h1>
             </div>
@@ -243,18 +243,16 @@ function Dashboard({
           <div className="flex shrink-0 items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
-              className="h-9 border-slate-300 text-xs font-bold"
+              className="h-10 rounded-lg border-slate-300 px-3! text-xs font-bold lg:h-11 lg:rounded-xl lg:px-5! lg:text-sm"
               onClick={copyCatalogLink}
             >
-              <Copy className="mr-1 h-3.5 w-3.5" />
+              <Copy className="size-4 lg:size-5" />
               <span className="hidden sm:inline">Salin Link Katalog</span>
               <span className="sm:hidden">Salin</span>
             </Button>
             <Button
               asChild
-              size="sm"
-              className="h-9 bg-blue-700 text-xs font-bold hover:bg-blue-800"
+              className="h-10 rounded-lg bg-blue-700 px-3 text-xs font-bold hover:bg-blue-800 lg:h-11 lg:rounded-xl lg:px-5 lg:text-sm"
             >
               <Link href={`/s/${slug}?owner=1`} target="_blank">
                 Lihat Katalog
@@ -269,25 +267,25 @@ function Dashboard({
 
       <AdminNav slug={slug} role={session.role} />
 
-      <div className="mx-auto w-full max-w-6xl flex-1 space-y-4 px-4 py-4">
+      <div className="mx-auto w-full max-w-7xl flex-1 space-y-4 px-4 py-4 sm:px-6 lg:space-y-6 lg:px-10 lg:py-6">
         {loading && (
-          <div className="space-y-3">
-            <div className="h-20 animate-pulse rounded-lg bg-slate-200" />
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="space-y-3 lg:space-y-4">
+            <div className="h-20 animate-pulse rounded-lg bg-slate-200 lg:h-28 lg:rounded-2xl" />
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-6">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-24 animate-pulse rounded-lg bg-slate-200" />
+                <div key={i} className="h-24 animate-pulse rounded-lg bg-slate-200 lg:h-28 lg:rounded-2xl" />
               ))}
             </div>
-            <div className="h-40 animate-pulse rounded-lg bg-slate-200" />
+            <div className="h-40 animate-pulse rounded-lg bg-slate-200 lg:rounded-2xl" />
           </div>
         )}
 
         {loadError && !loading && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
-            <p className="text-sm font-bold text-red-800">{loadError}</p>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center lg:p-5">
+            <p className="text-sm font-bold text-red-800 lg:text-base">{loadError}</p>
             <Button
               variant="outline"
-              className="mt-3 h-10 border-red-300 text-xs font-bold"
+              className="mt-3 h-10 border-red-300 text-xs font-bold lg:h-11 lg:text-sm"
               onClick={() => refreshInventory()}
             >
               Coba Lagi
@@ -305,25 +303,25 @@ function Dashboard({
 
             {/* Lisensi & kuota — hanya owner (admin tidak berhak melihat lisensi) */}
             {isOwner && data.license && data.quota && (
-              <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 lg:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-xs font-bold text-slate-900">
+                    <p className="text-sm font-bold text-slate-900">
                       Lisensi{' '}
                       <span className="font-mono">{data.license.licenseKey}</span>
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="mt-0.5 text-xs text-slate-500 lg:text-sm">
                       Plan {PLAN_LABELS[data.license.planType] ?? data.license.planType} •{' '}
                       {data.license.expiresAt
                         ? `berlaku s/d ${new Date(data.license.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`
                         : 'Lifetime'}
                     </p>
                   </div>
-                  <p className="text-xs font-extrabold text-slate-700">
+                  <p className="text-sm font-extrabold text-slate-700">
                     {data.quota.active}/{data.quota.max} unit aktif
                   </p>
                 </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div
                     className={`h-full rounded-full ${quotaFull ? 'bg-red-600' : 'bg-blue-700'}`}
                     style={{
@@ -335,76 +333,76 @@ function Dashboard({
             )}
 
             {/* Statistik */}
-            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-6">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 lg:text-xs">
                   Stok Aktif
                 </p>
-                <p className="mt-1 text-2xl font-extrabold text-slate-900">
+                <p className="mt-1 text-2xl font-extrabold text-slate-900 lg:mt-2 lg:text-4xl lg:font-black">
                   {data.stats.available}
                 </p>
-                <p className="text-[11px] text-slate-400">unit siap jual</p>
+                <p className="text-[11px] text-slate-400 lg:text-sm lg:font-medium">unit siap jual</p>
               </div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 lg:text-xs">
                   Ditahan
                 </p>
-                <p className="mt-1 text-2xl font-extrabold text-amber-900">{data.stats.hold}</p>
-                <p className="text-[11px] text-amber-700">unit di-hold marketing</p>
+                <p className="mt-1 text-2xl font-extrabold text-amber-900 lg:mt-2 lg:text-4xl lg:font-black">{data.stats.hold}</p>
+                <p className="text-[11px] text-amber-700 lg:text-sm lg:font-medium">unit di-hold marketing</p>
               </div>
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-red-700 lg:text-xs">
                   Terjual
                 </p>
-                <p className="mt-1 text-2xl font-extrabold text-red-900">{data.stats.sold}</p>
-                <p className="text-[11px] text-red-700">unit deal</p>
+                <p className="mt-1 text-2xl font-extrabold text-red-900 lg:mt-2 lg:text-4xl lg:font-black">{data.stats.sold}</p>
+                <p className="text-[11px] text-red-700 lg:text-sm lg:font-medium">unit deal</p>
               </div>
               {isOwner ? (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700 lg:text-xs">
                     Perputaran Modal
                   </p>
-                  <p className="mt-1 text-base font-extrabold leading-snug text-slate-900">
+                  <p className="mt-1 text-base font-extrabold leading-snug text-slate-900 lg:mt-2 lg:text-2xl lg:font-black">
                     {formatRupiah(data.stats.capitalTurnover)}
                   </p>
-                  <p className="text-[11px] text-blue-700">
+                  <p className="text-[11px] text-blue-700 lg:text-sm lg:font-medium">
                     Nilai jual stok: {formatRupiah(data.stats.stockValue)}
                   </p>
                 </div>
               ) : (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm lg:rounded-2xl lg:p-6">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700 lg:text-xs">
                     Nilai Jual Stok
                   </p>
-                  <p className="mt-1 text-base font-extrabold leading-snug text-slate-900">
+                  <p className="mt-1 text-base font-extrabold leading-snug text-slate-900 lg:mt-2 lg:text-2xl lg:font-black">
                     {formatRupiah(data.stats.stockValue)}
                   </p>
-                  <p className="text-[11px] text-blue-700">total harga jual unit aktif</p>
+                  <p className="text-[11px] text-blue-700 lg:text-sm lg:font-medium">total harga jual unit aktif</p>
                 </div>
               )}
             </section>
 
             {/* Tahanan aktif */}
             {data.holds.length > 0 && (
-              <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-                <h2 className="text-sm font-extrabold text-amber-900">
+              <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 lg:p-5">
+                <h2 className="text-base font-extrabold text-amber-900 lg:text-lg">
                   Tahanan Aktif ({data.holds.length})
                 </h2>
                 <div className="mt-2 space-y-2">
                   {data.holds.map((h) => (
                     <div
                       key={h.id}
-                      className="flex flex-col gap-2 rounded-md border border-amber-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between lg:px-4"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-slate-900">
                           {h.vehicleLabel}
                         </p>
-                        <p className="mt-0.5 text-xs text-slate-600">
+                        <p className="mt-0.5 text-xs text-slate-600 lg:text-sm">
                           Ditahan oleh{' '}
                           <span className="font-bold text-slate-900">{h.marketingName}</span>
                           {h.marketingId && (
-                            <span className="ml-1.5 rounded border border-blue-200 bg-blue-50 px-1 py-0.5 text-[10px] font-extrabold text-blue-700">
+                            <span className="ml-1.5 rounded border border-blue-200 bg-blue-50 px-1 py-0.5 text-[10px] font-extrabold text-blue-700 lg:text-xs">
                               Rekanan
                             </span>
                           )}{' '}
@@ -420,13 +418,13 @@ function Dashboard({
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-extrabold tabular-nums text-amber-800">
+                        <span className="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-extrabold tabular-nums text-amber-800 lg:text-sm">
                           <Countdown expiresAt={h.expiresAt} onDone={() => refreshInventory()} />
                         </span>
                         <Button
                           size="sm"
                           disabled={busyId === h.vehicleId}
-                          className="h-9 bg-emerald-700 text-xs font-bold hover:bg-emerald-800"
+                          className="h-10 rounded-lg bg-emerald-700 px-3.5 text-xs font-bold hover:bg-emerald-800 lg:text-sm"
                           onClick={() => setHoldStatusById(h.vehicleId, 'sold')}
                         >
                           Deal (Terjual)
@@ -435,7 +433,7 @@ function Dashboard({
                           size="sm"
                           variant="outline"
                           disabled={busyId === h.vehicleId}
-                          className="h-9 border-slate-300 text-xs font-bold"
+                          className="h-10 rounded-lg border-slate-300 px-3.5 text-xs font-bold lg:text-sm"
                           onClick={() => setHoldStatusById(h.vehicleId, 'available')}
                         >
                           Lepas
@@ -448,24 +446,24 @@ function Dashboard({
             )}
 
             {/* Toolbar */}
-            <section className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <section className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:gap-3">
+              <div className="relative min-w-0 flex-1 sm:min-w-64">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 lg:left-4 lg:h-5 lg:w-5" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Cari merk, model, atau plat..."
-                  className="h-10 bg-white pl-9"
+                  className="h-11 bg-white pl-9 text-sm lg:h-12 lg:pl-10 lg:text-base"
                   aria-label="Cari unit"
                 />
               </div>
-              <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+              <div className="flex rounded-lg border border-slate-300 bg-white p-0.5 lg:rounded-xl lg:p-1">
                 {(['all', 'available', 'hold', 'sold'] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
                     onClick={() => setStatusFilter(s)}
-                    className={`h-9 flex-1 whitespace-nowrap rounded-md px-3 text-xs font-bold sm:flex-none ${
+                    className={`h-10 flex-1 whitespace-nowrap rounded-md px-3 text-xs font-bold sm:flex-none lg:h-11 lg:rounded-lg lg:px-4 lg:text-sm ${
                       statusFilter === s
                         ? 'bg-slate-900 text-white'
                         : 'text-slate-600 hover:bg-slate-100'
@@ -477,7 +475,7 @@ function Dashboard({
               </div>
               {/* Filter kategori & merek dari taxonomy showroom */}
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="h-10 w-full bg-white text-xs font-bold sm:w-40" aria-label="Filter kategori">
+                <SelectTrigger className="h-11! w-full bg-white text-xs font-bold sm:w-40 lg:h-12! lg:w-44 lg:text-sm" aria-label="Filter kategori">
                   <SelectValue placeholder="Semua Kategori" />
                 </SelectTrigger>
                 <SelectContent>
@@ -490,7 +488,7 @@ function Dashboard({
                 </SelectContent>
               </Select>
               <Select value={brandFilter} onValueChange={setBrandFilter}>
-                <SelectTrigger className="h-10 w-full bg-white text-xs font-bold sm:w-36" aria-label="Filter merek">
+                <SelectTrigger className="h-11! w-full bg-white text-xs font-bold sm:w-36 lg:h-12! lg:w-40 lg:text-sm" aria-label="Filter merek">
                   <SelectValue placeholder="Semua Merek" />
                 </SelectTrigger>
                 <SelectContent>
@@ -506,7 +504,7 @@ function Dashboard({
               {data.branches.length > 0 && (
                 <Select value={branchFilter} onValueChange={setBranchFilter}>
                   <SelectTrigger
-                    className="h-10 w-full bg-white text-xs font-bold sm:w-44"
+                    className="h-11! w-full bg-white text-xs font-bold sm:w-44 lg:h-12! lg:w-48 lg:text-sm"
                     aria-label="Filter lokasi cabang"
                   >
                     <SelectValue placeholder="Semua Lokasi" />
@@ -523,7 +521,7 @@ function Dashboard({
                 </Select>
               )}
               <Button
-                className="h-10 bg-blue-700 px-4 text-sm font-extrabold hover:bg-blue-800"
+                className="h-11 rounded-lg bg-blue-700 px-5! text-sm font-extrabold hover:bg-blue-800 sm:ml-auto lg:h-12 lg:rounded-xl lg:text-base lg:font-bold"
                 disabled={quotaFull}
                 title={quotaFull ? 'Kuota lisensi penuh' : undefined}
                 onClick={() => {
@@ -531,34 +529,34 @@ function Dashboard({
                   setFormOpen(true)
                 }}
               >
-                <Plus className="mr-1 h-4 w-4" /> Tambah Motor
+                <Plus className="size-4 lg:size-5" /> Tambah Motor
               </Button>
             </section>
 
             {/* Inventaris */}
             {filtered.length === 0 ? (
-              <div className="flex flex-col items-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
-                <Package className="h-8 w-8 text-slate-300" aria-hidden />
-                <p className="mt-2 text-sm font-bold text-slate-700">
+              <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center lg:py-16">
+                <Package className="h-8 w-8 text-slate-300 lg:h-10 lg:w-10" aria-hidden />
+                <p className="mt-2 text-sm font-bold text-slate-700 lg:text-base">
                   {data.vehicles.length === 0
                     ? 'Belum ada unit di showroom ini.'
                     : 'Tidak ada unit yang cocok dengan filter.'}
                 </p>
                 {data.vehicles.length === 0 && (
                   <Button
-                    className="mt-4 h-11 bg-blue-700 font-bold hover:bg-blue-800"
+                    className="mt-4 h-11 rounded-lg bg-blue-700 px-5! font-bold hover:bg-blue-800 lg:h-12 lg:rounded-xl lg:text-base"
                     disabled={quotaFull}
                     onClick={() => {
                       setEditing(null)
                       setFormOpen(true)
                     }}
                   >
-                    <Plus className="mr-1 h-4 w-4" /> Tambah Motor Pertama
+                    <Plus className="size-4 lg:size-5" /> Tambah Motor Pertama
                   </Button>
                 )}
               </div>
             ) : (
-              <section className="grid gap-3 md:grid-cols-2">
+              <section className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4">
                 {filtered.map((v) => (
                   <AdminVehicleCard
                     key={v.id}
@@ -627,7 +625,7 @@ function Dashboard({
       >
         <AlertDialogContent className="sm:max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base font-extrabold">
+            <AlertDialogTitle className="text-lg font-extrabold">
               Hapus unit ini?
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -637,9 +635,9 @@ function Dashboard({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10">Batal</AlertDialogCancel>
+            <AlertDialogCancel className="h-11 rounded-lg">Batal</AlertDialogCancel>
             <AlertDialogAction
-              className="h-10 bg-red-700 font-bold hover:bg-red-800"
+              className="h-11 rounded-lg bg-red-700 font-bold hover:bg-red-800"
               onClick={(e) => {
                 e.preventDefault()
                 confirmDelete()
@@ -674,43 +672,46 @@ function AdminVehicleCard({
   onBroadcast: (kind: 'new' | 'sold') => void
 }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex gap-3">
-        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-100 sm:h-24 sm:w-24">
+    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm lg:rounded-2xl lg:p-4">
+      <div className="flex gap-3 xl:flex-col">
+        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100 sm:h-24 sm:w-24 lg:h-28 lg:w-28 xl:h-auto xl:w-full xl:aspect-[4/3] xl:rounded-xl">
           <VehiclePhoto
-            sizes="96px"
+            sizes="(min-width: 1280px) 250px, (min-width: 1024px) 112px, 96px"
             src={v.photos[0]}
             alt={`Foto ${v.brand} ${v.model}`}
             className="h-full w-full object-cover"
           />
           <div className="absolute bottom-1 left-1">
-            <StatusBadge status={v.status} />
+            <StatusBadge
+              status={v.status}
+              className="rounded-lg px-2 py-0.5 text-[10px] lg:px-3 lg:py-1.5 lg:text-xs"
+            />
           </div>
         </div>
 
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-extrabold text-slate-900">
+          <h3 className="line-clamp-2 text-base font-bold leading-snug text-slate-900 lg:text-lg">
             {v.brand} {v.model}
           </h3>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-1 text-xs leading-relaxed text-slate-500 lg:text-sm">
             {v.year} • {v.licensePlate} • {formatKm(v.odometer)}
             {v.color ? ` • ${v.color}` : ''}
           </p>
           {showLocation && (
-            <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-slate-600">
-              <MapPin className="h-3 w-3 shrink-0 text-blue-700" aria-hidden />
+            <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-slate-600 lg:text-sm">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-blue-700" aria-hidden />
               {v.branch ? v.branch.name : 'Lokasi Utama'}
             </p>
           )}
           <div className="mt-1.5 flex flex-wrap gap-1">
             {v.category && (
-              <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
+              <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-800 lg:px-2 lg:text-xs">
                 {v.category}
               </span>
             )}
             {v.taxStatus && (
               <span
-                className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${
+                className={`rounded border px-1.5 py-0.5 text-[10px] font-bold lg:px-2 lg:text-xs ${
                   isTaxAlive(v.taxStatus)
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                     : 'border-red-200 bg-red-50 text-red-700'
@@ -720,39 +721,39 @@ function AdminVehicleCard({
               </span>
             )}
             {v.documentStatus && (
-              <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+              <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 lg:px-2 lg:text-xs">
                 {v.documentStatus}
               </span>
             )}
           </div>
-          <div className={`mt-2 grid gap-2 ${isOwner ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          <div className="mt-2 space-y-1.5 lg:mt-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 lg:text-xs">
                 Harga Jual
               </p>
-              <p className="text-sm font-extrabold text-slate-900">
+              <p className="text-sm font-extrabold text-slate-900 lg:text-base">
                 {formatRupiah(v.sellingPrice)}
               </p>
             </div>
             {isOwner && (
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 lg:text-xs">
                   Modal
                 </p>
-                <p className="text-sm font-bold text-slate-700">{formatRupiah(v.basePrice)}</p>
+                <p className="text-sm font-bold text-slate-700 lg:text-base lg:font-extrabold">{formatRupiah(v.basePrice)}</p>
               </div>
             )}
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-2 py-1 ring-1 ring-emerald-100">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 lg:text-xs">
                 Komisi
               </p>
-              <p className="text-sm font-bold text-emerald-700">
+              <p className="text-sm font-bold text-emerald-700 lg:text-base">
                 {formatRupiah(v.commissionAmount)}
               </p>
             </div>
           </div>
           {v.activeHold && (
-            <p className="mt-1.5 rounded bg-amber-50 px-1.5 py-1 text-[11px] font-bold text-amber-800">
+            <p className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800 lg:text-xs">
               Ditahan oleh {v.activeHold.marketingName} •{' '}
               <Countdown
                 expiresAt={v.activeHold.expiresAt}
@@ -763,15 +764,15 @@ function AdminVehicleCard({
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <div className="flex flex-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+      <div className="mt-3 flex flex-wrap items-center gap-2 lg:mt-4 lg:gap-2.5">
+        <div className="flex flex-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5 xl:basis-full xl:p-1 lg:rounded-xl">
           {(['available', 'hold', 'sold'] as const).map((s) => (
             <button
               key={s}
               type="button"
               disabled={busy}
               onClick={() => onStatus(s)}
-              className={`h-8 flex-1 rounded-md text-[11px] font-extrabold disabled:opacity-50 ${
+              className={`h-9 flex-1 rounded-md text-[11px] font-extrabold disabled:opacity-50 lg:h-10 lg:rounded-lg lg:text-sm ${
                 v.status === s ? STATUS_TONE[s] : 'text-slate-500 hover:bg-white'
               }`}
             >
@@ -782,7 +783,7 @@ function AdminVehicleCard({
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9 shrink-0 border-slate-300 hover:bg-emerald-50"
+          className="h-10 w-10 shrink-0 border-slate-300 hover:bg-emerald-50"
           onClick={() => onBroadcast(v.status === 'sold' ? 'sold' : 'new')}
           aria-label={`Broadcast WA ${v.brand} ${v.model}`}
           title="Kirim update ke grup WA"
@@ -792,7 +793,7 @@ function AdminVehicleCard({
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9 shrink-0 border-slate-300"
+          className="h-10 w-10 shrink-0 border-slate-300"
           onClick={onEdit}
           aria-label={`Edit ${v.brand} ${v.model}`}
         >
@@ -801,7 +802,7 @@ function AdminVehicleCard({
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9 shrink-0 border-slate-300 hover:bg-red-50"
+          className="h-10 w-10 shrink-0 border-slate-300 hover:bg-red-50"
           onClick={onDelete}
           aria-label={`Hapus ${v.brand} ${v.model}`}
         >

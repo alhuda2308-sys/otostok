@@ -211,9 +211,9 @@ export function VehicleForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="text-base font-extrabold">
+          <DialogTitle className="text-lg font-extrabold">
             {editing ? `Edit Unit — ${editing.brand} ${editing.model}` : 'Tambah Motor Baru'}
           </DialogTitle>
           <DialogDescription>
@@ -224,16 +224,16 @@ export function VehicleForm({
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="v-brand">Merk *</Label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="v-brand" className="font-semibold text-slate-700">Merk *</Label>
               {!newBrandMode ? (
                 <div className="flex gap-1.5">
                   <Select
                     value={brandOptions.includes(form.brand) ? form.brand : undefined}
                     onValueChange={(v) => set('brand', v)}
                   >
-                    <SelectTrigger id="v-brand" className="h-11 w-full">
+                    <SelectTrigger id="v-brand" className="h-11! w-full rounded-xl lg:h-12! lg:text-base">
                       <SelectValue
                         placeholder={form.brand || 'Pilih merk'}
                       />
@@ -249,7 +249,7 @@ export function VehicleForm({
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 shrink-0 border-slate-300 px-3"
+                    className="h-11 shrink-0 rounded-xl border-slate-300 px-3 lg:h-12"
                     title="Tambah merk baru"
                     onClick={() => {
                       setNewBrandMode(true)
@@ -266,12 +266,12 @@ export function VehicleForm({
                     value={newBrand}
                     onChange={(e) => setNewBrand(e.target.value)}
                     placeholder="Nama merk baru (cth: TVS)"
-                    className="h-11"
+                    className="h-11 rounded-xl lg:h-12 lg:text-base"
                     autoFocus
                   />
                   <Button
                     type="button"
-                    className="h-11 shrink-0 bg-blue-700 px-3 text-xs font-bold hover:bg-blue-800"
+                    className="h-11 shrink-0 rounded-xl bg-blue-700 px-3 text-xs font-bold hover:bg-blue-800"
                     onClick={async () => {
                       const name = newBrand.trim()
                       if (name.length < 2) return
@@ -295,25 +295,25 @@ export function VehicleForm({
                 </div>
               )}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="v-model">Model / Tipe *</Label>
+            <div className="space-y-2">
+              <Label htmlFor="v-model" className="font-semibold text-slate-700">Model / Tipe *</Label>
               <Input
                 id="v-model"
                 value={form.model}
                 onChange={(e) => set('model', e.target.value)}
                 placeholder="cth: Beat 110 CBS"
-                className="h-11"
+                className="h-11 rounded-xl lg:h-12 lg:text-base"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="v-cat">Kategori</Label>
+            <div className="space-y-2">
+              <Label htmlFor="v-cat" className="font-semibold text-slate-700">Kategori</Label>
               {!newCategoryMode ? (
                 <div className="flex gap-1.5">
                   <Select
                     value={form.category || undefined}
                     onValueChange={(v) => set('category', v)}
                   >
-                    <SelectTrigger id="v-cat" className="h-11 w-full">
+                    <SelectTrigger id="v-cat" className="h-11! w-full rounded-xl lg:h-12! lg:text-base">
                       <SelectValue placeholder="Pilih kategori" />
                     </SelectTrigger>
                     <SelectContent>
@@ -327,7 +327,7 @@ export function VehicleForm({
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 shrink-0 border-slate-300 px-3"
+                    className="h-11 shrink-0 rounded-xl border-slate-300 px-3 lg:h-12"
                     title="Tambah kategori baru"
                     onClick={() => {
                       setNewCategoryMode(true)
@@ -344,12 +344,12 @@ export function VehicleForm({
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     placeholder="cth: Retro / Cub Pax"
-                    className="h-11"
+                    className="h-11 rounded-xl lg:h-12 lg:text-base"
                     autoFocus
                   />
                   <Button
                     type="button"
-                    className="h-11 shrink-0 bg-blue-700 px-3 text-xs font-bold hover:bg-blue-800"
+                    className="h-11 shrink-0 rounded-xl bg-blue-700 px-3 text-xs font-bold hover:bg-blue-800"
                     onClick={async () => {
                       const name = newCategory.trim()
                       if (name.length < 2) return
@@ -374,13 +374,13 @@ export function VehicleForm({
             </div>
             {/* Lokasi unit — hanya muncul bila showroom punya cabang (>1 lokasi) */}
             {branches.length > 0 && (
-              <div className="space-y-1.5">
-                <Label htmlFor="v-branch">Lokasi Unit Berada</Label>
+              <div className="space-y-2">
+                <Label htmlFor="v-branch" className="font-semibold text-slate-700">Lokasi Unit Berada</Label>
                 <Select
                   value={form.branchId || 'main'}
                   onValueChange={(v) => set('branchId', v === 'main' ? '' : v)}
                 >
-                  <SelectTrigger id="v-branch" className="h-11 w-full">
+                  <SelectTrigger id="v-branch" className="h-11! w-full rounded-xl lg:h-12! lg:text-base">
                     <SelectValue placeholder="Pilih lokasi unit" />
                   </SelectTrigger>
                   <SelectContent>
@@ -392,63 +392,63 @@ export function VehicleForm({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   Lokasi fisik motor — tampil di katalog marketing agar marketing tidak salah antar.
                 </p>
               </div>
             )}
-            <div className="space-y-1.5">
-              <Label htmlFor="v-year">Tahun *</Label>
+            <div className="space-y-2">
+              <Label htmlFor="v-year" className="font-semibold text-slate-700">Tahun *</Label>
               <Input
                 id="v-year"
                 value={form.year}
                 onChange={(e) => set('year', e.target.value.replace(/\D/g, '').slice(0, 4))}
                 inputMode="numeric"
                 placeholder="cth: 2020"
-                className="h-11"
+                className="h-11 rounded-xl lg:h-12 lg:text-base"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="v-plate">Plat Nomor *</Label>
+            <div className="space-y-2">
+              <Label htmlFor="v-plate" className="font-semibold text-slate-700">Plat Nomor *</Label>
               <Input
                 id="v-plate"
                 value={form.licensePlate}
                 onChange={(e) => set('licensePlate', e.target.value.toUpperCase())}
                 placeholder="cth: B 4521 KZA"
-                className="h-11 font-bold uppercase"
+                className="h-11 rounded-xl font-bold uppercase lg:h-12 lg:text-base"
                 style={{ textTransform: 'uppercase' }}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="v-color">Warna</Label>
+            <div className="space-y-2">
+              <Label htmlFor="v-color" className="font-semibold text-slate-700">Warna</Label>
               <Input
                 id="v-color"
                 value={form.color}
                 onChange={(e) => set('color', e.target.value)}
                 placeholder="cth: Hitam"
-                className="h-11"
+                className="h-11 rounded-xl lg:h-12 lg:text-base"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="v-odo">Odometer (KM)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="v-odo" className="font-semibold text-slate-700">Odometer (KM)</Label>
               <Input
                 id="v-odo"
                 value={form.odometer}
                 onChange={(e) => set('odometer', e.target.value.replace(/\D/g, '').slice(0, 7))}
                 inputMode="numeric"
                 placeholder="cth: 15420"
-                className="h-11"
+                className="h-11 rounded-xl lg:h-12 lg:text-base"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="v-tax">Kondisi Pajak</Label>
+            <div className="space-y-2">
+              <Label htmlFor="v-tax" className="font-semibold text-slate-700">Kondisi Pajak</Label>
               <Input
                 id="v-tax"
                 list="tax-suggestions"
                 value={form.taxStatus}
                 onChange={(e) => set('taxStatus', e.target.value)}
                 placeholder="cth: Hidup s/d 03/2026"
-                className="h-11"
+                className="h-11 rounded-xl lg:h-12 lg:text-base"
               />
               <datalist id="tax-suggestions">
                 <option value="Pajak panjang (aman lebih dari 6 bulan)" />
@@ -456,13 +456,13 @@ export function VehicleForm({
                 <option value="Mati pajak 1 tahun" />
               </datalist>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="v-doc">Kelengkapan Surat</Label>
+            <div className="space-y-2">
+              <Label htmlFor="v-doc" className="font-semibold text-slate-700">Kelengkapan Surat</Label>
               <Select
                 value={form.documentStatus || undefined}
                 onValueChange={(v) => set('documentStatus', v)}
               >
-                <SelectTrigger id="v-doc" className="h-11 w-full">
+                <SelectTrigger id="v-doc" className="h-11! w-full rounded-xl lg:h-12! lg:text-base">
                   <SelectValue placeholder="Pilih kelengkapan surat" />
                 </SelectTrigger>
                 <SelectContent>
@@ -478,13 +478,13 @@ export function VehicleForm({
 
           {/* Harga — hanya owner */}
           {canSeeBasePrice && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 lg:p-4">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
                 Angka sensitif — hanya tampil di dashboard owner
               </p>
-              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="v-base" className="text-xs">
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="v-base" className="font-semibold text-slate-700">
                     Harga Modal (Rp)
                   </Label>
                   <MoneyInput
@@ -492,13 +492,14 @@ export function VehicleForm({
                     value={form.basePrice}
                     onChange={(v) => set('basePrice', v)}
                     placeholder="0"
+                    className="h-11 rounded-xl text-sm font-bold lg:h-12 lg:text-base"
                   />
-                  <p className="text-[10px] text-red-700">
+                  <p className="text-xs text-red-700">
                     Tidak pernah tampil di katalog marketing.
                   </p>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="v-sell" className="text-xs">
+                <div className="space-y-2">
+                  <Label htmlFor="v-sell" className="font-semibold text-slate-700">
                     Harga Jual (Rp)
                   </Label>
                   <MoneyInput
@@ -506,10 +507,11 @@ export function VehicleForm({
                     value={form.sellingPrice}
                     onChange={(v) => set('sellingPrice', v)}
                     placeholder="0"
+                    className="h-11 rounded-xl text-sm font-bold lg:h-12 lg:text-base"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="v-comm" className="text-xs">
+                <div className="space-y-2">
+                  <Label htmlFor="v-comm" className="font-semibold text-slate-700">
                     Komisi Marketing (Rp)
                   </Label>
                   <MoneyInput
@@ -517,9 +519,10 @@ export function VehicleForm({
                     value={form.commissionAmount}
                     onChange={(v) => set('commissionAmount', v)}
                     placeholder="0"
+                    className="h-11 rounded-xl text-sm font-bold lg:h-12 lg:text-base"
                   />
                   {form.commissionAmount != null && (
-                    <p className="text-[10px] font-semibold text-emerald-700">
+                    <p className="text-xs font-semibold text-emerald-700">
                       {formatRupiah(form.commissionAmount)} / unit deal
                     </p>
                   )}
@@ -528,15 +531,15 @@ export function VehicleForm({
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="v-notes">Catatan Unit</Label>
+          <div className="space-y-2">
+            <Label htmlFor="v-notes" className="font-semibold text-slate-700">Catatan Unit</Label>
             <Textarea
               id="v-notes"
               value={form.notes}
               onChange={(e) => set('notes', e.target.value)}
               placeholder="cth: Mesin sehat, bodi mulus, siap pakai tanpa servicing."
               rows={2}
-              className="resize-none"
+              className="resize-none rounded-xl lg:text-base"
               maxLength={500}
             />
           </div>
@@ -559,7 +562,7 @@ export function VehicleForm({
             <Button
               type="button"
               variant="outline"
-              className="h-12 border-slate-300 font-bold"
+              className="h-12 rounded-xl border-slate-300 text-base font-semibold"
               onClick={() => onOpenChange(false)}
             >
               Batal
@@ -567,7 +570,7 @@ export function VehicleForm({
             <Button
               type="submit"
               disabled={saving}
-              className="h-12 flex-1 bg-blue-700 text-sm font-extrabold hover:bg-blue-800"
+              className="h-12 flex-1 rounded-xl bg-blue-700 text-base font-bold hover:bg-blue-800"
             >
               {saving ? 'Menyimpan...' : editing ? 'Simpan Perubahan' : 'Simpan ke Stok'}
             </Button>

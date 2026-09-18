@@ -184,15 +184,15 @@ export function SessionBadge({ session }: { session: AdminSession }) {
   return (
     <div className="flex items-center gap-2">
       <div className="text-right leading-tight">
-        <p className="text-[11px] font-extrabold text-slate-900">{session.name}</p>
-        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        <p className="text-xs font-extrabold text-slate-900 lg:text-sm">{session.name}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 lg:text-xs">
           {session.role === 'owner' ? 'Owner' : 'Admin Staf'}
         </p>
       </div>
       <Button
         variant="outline"
         size="icon"
-        className="h-9 w-9 border-slate-300"
+        className="h-10 w-10 border-slate-300"
         onClick={logout}
         aria-label="Keluar"
         title="Keluar"
@@ -227,7 +227,7 @@ export function AdminNav({ slug, role }: { slug: string; role: StaffRole }) {
       aria-label="Navigasi admin"
       className="scrollbar-thin sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur"
     >
-      <div className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-2 py-2">
+      <div className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-2 py-2 sm:px-4 lg:gap-1.5 lg:px-10">
         {items.map((it) => {
           const active =
             it.href === base ? pathname === base : pathname.startsWith(it.href)
@@ -238,13 +238,13 @@ export function AdminNav({ slug, role }: { slug: string; role: StaffRole }) {
               href={it.href}
               prefetch={true}
               aria-current={active ? 'page' : undefined}
-              className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-extrabold ${
+              className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-xs font-extrabold lg:h-12 lg:gap-2 lg:rounded-xl lg:px-5 lg:text-base lg:font-semibold ${
                 active
                   ? 'bg-blue-700 text-white'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              <it.icon className="h-3.5 w-3.5" aria-hidden />
+              <it.icon className="h-4 w-4 lg:h-5 lg:w-5" aria-hidden />
               {it.label}
             </Link>
           )
@@ -270,17 +270,17 @@ export function AdminSubHeader({
 }) {
   return (
     <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 px-4">
+      <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:h-16 lg:px-10">
         <div className="flex min-w-0 items-center gap-2.5">
-          <AppIcon className="h-8 w-8 shrink-0" />
+          <AppIcon className="h-9 w-9 shrink-0 lg:h-10 lg:w-10" />
           <div className="min-w-0 leading-tight">
             <Link
               href={`/admin/${slug}`}
-              className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 hover:underline"
+              className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 hover:underline lg:text-xs"
             >
               &larr; Dashboard
             </Link>
-            <h1 className="truncate text-sm font-extrabold text-slate-900">{title}</h1>
+            <h1 className="truncate text-base font-extrabold text-slate-900 lg:text-lg">{title}</h1>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -289,8 +289,8 @@ export function AdminSubHeader({
         </div>
       </div>
       {subtitle && (
-        <div className="mx-auto w-full max-w-6xl px-4 pb-2">
-          <p className="text-xs text-slate-500">{subtitle}</p>
+        <div className="mx-auto w-full max-w-7xl px-4 pb-2 sm:px-6 lg:px-10">
+          <p className="text-xs text-slate-500 lg:text-sm">{subtitle}</p>
         </div>
       )}
     </header>

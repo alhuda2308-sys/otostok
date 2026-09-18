@@ -884,3 +884,27 @@ Work Log:
 Stage Summary:
 - Portal Kerja kini "UI Scale Up" penuh: semua target sentuh >=44px, teks konten >=14px (badge/metadata text-xs sesuai spec user), kartu rounded-xl dgn shadow lembut, tanpa teks terpotong di 390px maupun 900px
 - StatusBadge kini reusable 2 ukuran via cn (default katalog kecil, portal md) tanpa duplikasi komponen
+---
+Task ID: dashboard-desktop-scale-up
+Agent: main (Z.ai Code)
+Task: Scale Up & optimasi layout Dashboard Owner khusus Desktop (laptop/PC) — kontainer lega, header/tab/stats/kartu/form diperbesar, mobile tidak berubah
+
+Work Log:
+- admin-shell.tsx (shell bersama, konsisten di SEMUA halaman admin): AdminNav max-w-6xl->max-w-7xl px sm:4 lg:10, tab h-9 text-xs -> h-10 text-xs lg:h-12 lg:px-5 lg:text-base lg:font-semibold rounded-xl, ikon lg:size-5; AdminSubHeader max-w-7xl h-14 lg:h-16, judul text-base lg:text-lg, back-link lg:text-xs, subtitle lg:text-sm; SessionBadge nama text-xs lg:text-sm + logout h-10 w-10
+- admin-client.tsx header: h-14 lg:h-20, logo lg:h-12 lg:rounded-xl, nama showroom text-sm sm:text-base lg:text-2xl font-extrabold, label lg:text-xs; tombol Salin Link Katalog/Lihat Katalog h-10 lg:h-11 rounded-xl lg:px-5! text-sm (px pakai important karena [&_svg]/has-[>svg] base menimpa px biasa), ikon size-4 lg:size-5, mr-1 dihapus (Button base gap-2)
+- Kontainer utama: max-w-6xl px-4 -> max-w-7xl px-4 sm:px-6 lg:px-10, space-y lg:6, py lg:6; skeleton ikut rounded-2xl lg:h-28
+- Stats cards: grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-6; kartu rounded-xl shadow-sm lg:rounded-2xl lg:p-6; angka text-2xl lg:text-4xl font-black (rupiah lg:text-2xl), label lg:text-xs, sub-line lg:text-sm font-medium; lisensi/kouta rounded-xl lg:p-5 text-sm
+- Tahanan aktif: rounded-xl lg:p-5, judul lg:text-lg, tombol Deal/Lepas h-10 rounded-lg lg:text-sm px-3.5, countdown badge lg:text-sm
+- Toolbar: sm:flex-wrap (anti overflow 1024-1450px; tombol Tambah Motor tadinya overflow 1100px), search min-w-64 h-11 lg:h-12 text-base, status pills h-10 lg:h-11 lg:text-sm, Select filter h-11! lg:h-12! lg:w-44/40/48 (important! karena data-[size=default]:h-9 base menimpa h-* biasa — bug lama tersembunyi), Tambah Motor h-11 lg:h-12 rounded-xl px-5! sm:ml-auto text lg:text-base
+- Inventaris grid: gap-3 md:2 lg:3 xl:4 gap lg:6; Kartu unit: rounded-xl lg:rounded-2xl lg:p-4; xl = kartu VERTIKAL (foto full-width aspect-4/3 248x186, judul bebas truncate, badge wrap); <xl tetap horizontal foto 80/96/112px; BLOK HARGA DIREDESIGN grid-3 kolom sempit -> baris justify-between (label kiri nilai kanan) + KOMISI kotak emerald ring (konsisten portal) — mobile ikut membaik; status switcher h-9 lg:h-10 lg:text-sm, xl:basis-full (pindah baris sendiri, ikon wrap bawah); ikon tombol h-10 w-10; StatusBadge foto className rounded-lg px-3 py-1.5 lg:text-xs (default katalog tidak berubah); title line-clamp-2 lg:text-lg
+- Dialog hapus: judul lg, tombol h-11 rounded-lg
+- vehicle-form.tsx: dialog sm:max-w-3xl, judul text-lg; SEMUA Input h-11 rounded-xl lg:h-12 lg:text-base (brand/model/brand-baru/kategori/tahun/plat/warna/odo/pajak + Textarea rounded-xl); SelectTrigger h-11! rounded-xl lg:h-12! lg:text-base (4x); Label semua font-semibold text-slate-700 (13x), space-y-1.5->2, gap sm:4; kotak harga rounded-xl lg:p-4; MoneyInput 3x h-11 rounded-xl lg:h-12; helper text-[10px]/[11px]->text-xs; Batal h-12 text-base font-semibold, Simpan h-12 flex-1 rounded-xl text-base font-bold; tombol + merk/kategori rounded-xl lg:h-12
+- E2E agent-browser (owner/demo1234): 1440px — hScroll false; h1 24px/800; tab 48px/16px/px-20; Salin 44px rounded-xl px-20; stats 4 kol gap-24, angka 36px/900; inv 4 kol gap-24; kartu xl vertikal foto 248x186, komisi box 248px, 0 overlap harga, 0 clipped text; form: dialog 768px, input 48px/16px/radius-12, label 14px/600/slate-700, submit 48px/16px/700; toast "Link katalog disalin" muncul; search filter Verza->1 kartu, Yamaha->4, clear->11
+- Bug ditemukan & diperbaiki saat E2E: (1) overflow horizontal 1100px oleh toolbar (Tambah Motor 197px) -> sm:flex-wrap+min-w-64+ml-auto, verifikasi 1024/1100/1440 hScroll false; (2) grid harga 3 kolom menumpuk di kartu sempit xl -> redesign baris justify-between; (3) SelectTrigger h-10/h-11 custom ternyata tak pernah effektif (data-[size] specificity) -> pakai ! important di dashboard+form
+- Regresi mobile 390px: hScroll false, stats 2 kol angka 24px, kartu horizontal 1 kolom foto 80px, tab 40px/12px, tombol header 40px; sub-halaman Mutasi: shell max-w-7xl h-16 konsisten; 0 error console
+- Lint bersih; tsc 0 error di src/ (hanya error pre-existing folder sandbox)
+
+Stage Summary:
+- Dashboard Owner kini memakai lebar penuh desktop (max-w-7xl + px-10): header 80px dgn nama showroom 24px, tab navigasi 48px, stats 4 kartu besar angka font-black 36px, stok motor grid 4 kolom kartu vertikal berfoto besar + blok harga rapi + komisi kotak emerald, form tambah/edit unit dgn input 48px rounded-xl & label tebal
+- Mobile 390px tidak rusak — malah membaik (blok harga tak lagi menumpuk); shell (nav/subheader) konsisten di semua halaman admin
+- Dua bug layout tersembunyi ditemukan saat E2E dan diperbaiki: overflow toolbar desktop-menengah & tinggi Select yang tak pernah bisa di-override
