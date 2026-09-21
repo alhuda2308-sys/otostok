@@ -1,6 +1,6 @@
 # MotoStock
 
-Aplikasi manajemen stok & katalog pemasaran untuk **showroom motor bekas** — mobile-first PWA dengan sistem lisensi (self-service activation) dan katalog publik siap-bagis ke WhatsApp.
+Aplikasi m anajemen stok & katalog pemasaran untuk **showroom motor bekas** — mobile-first PWA dengan sistem lisensi (self-service activation) dan katalog publik siap-bagis ke WhatsApp.
 
 ## Fitur
 
