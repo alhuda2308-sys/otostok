@@ -265,7 +265,7 @@ export default function HomePage() {
             </ul>
           </div>
 
-          {/* Mockup katalog (CSS murni, tanpa gambar — tetap ringan) */}
+          {/* Mockup katalog (thumbnail foto unit asli dari katalog demo — aset statis lokal, ringan) */}
           <div aria-hidden className="hidden lg:block">
             <div className="relative mx-auto w-full max-w-md">
               <div className="rounded-2xl border border-white/10 bg-white shadow-2xl shadow-blue-950/60">
@@ -279,7 +279,15 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-3 p-4">
                   <div className="flex gap-3 rounded-xl border border-slate-200 p-3">
-                    <div className="h-16 w-20 shrink-0 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200" />
+                    <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg">
+                      <Image
+                        src="/hero/unit-1.jpg"
+                        alt=""
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    </div>
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="h-2.5 w-3/4 rounded bg-slate-200" />
                       <div className="h-2 w-1/2 rounded bg-slate-100" />
@@ -292,7 +300,15 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="flex gap-3 rounded-xl border border-slate-200 p-3">
-                    <div className="h-16 w-20 shrink-0 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200" />
+                    <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg">
+                      <Image
+                        src="/hero/unit-2.jpg"
+                        alt=""
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    </div>
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="h-2.5 w-2/3 rounded bg-slate-200" />
                       <div className="h-2 w-2/5 rounded bg-slate-100" />
@@ -305,7 +321,15 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 opacity-70">
-                    <div className="h-16 w-20 shrink-0 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200" />
+                    <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg">
+                      <Image
+                        src="/hero/unit-3.jpg"
+                        alt=""
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    </div>
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="h-2.5 w-3/5 rounded bg-slate-200" />
                       <div className="h-2 w-1/3 rounded bg-slate-100" />

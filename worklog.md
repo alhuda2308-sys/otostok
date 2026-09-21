@@ -950,3 +950,18 @@ Work Log:
 Stage Summary:
 - Landing Page kini punya section bukti visual ("Preview Sistem") sebelum Pricing — memakai next/image teroptimasi dgn domain imgg.fr di-whitelist di next.config.ts
 - Catatan: kedua screenshot sebenarnya menampilkan KATALOG PUBLIK (desktop & mobile view) — label kartu mengikuti spec user; URL gambar mudah diganti lewat konstanta SHOWCASE_ITEMS di src/app/page.tsx jika mau screenshot Portal/Dashboard asli
+
+---
+Task ID: hero-real-photos
+Agent: main (Z.ai Code)
+Task: Ganti placeholder gradient mockup katalog di Hero Landing Page dengan foto motor asli agar tidak terlihat kosong/sederhana
+
+Work Log:
+- Crop 3 foto unit asli (Satria FU merah, AeroX biru, Scoopy putih) dari screenshot katalog demo imgg.fr (mipKFGNL.png) memakai PIL: /public/hero/unit-1..3.jpg (480px, JPEG q84, total ~109KB)
+- Iterasi crop 2x untuk membuang border putih kartu & icon kamera overlay
+- page.tsx hero mockup: 3 div gradient placeholder -> container relative overflow-hidden + Image fill sizes=80px object-cover (alt="" karena aria-hidden); struktur kartu Ready/Ditahan/Terjual + floating badge Komisi Marketing tetap dipertahankan
+- Lint 0 error; tsc 0 error di src/; E2E 1440px: foto tampil proporsional di semua kartu, 0 console error
+
+Stage Summary:
+- Hero kini menampilkan unit nyata dari katalog demo; aset statis lokal (public/hero/) — tanpa dependensi remote, tetap ringan
+- Push: commit hero-real-photos ke origin/main (kredensial sudah disimpan via git credential store)
