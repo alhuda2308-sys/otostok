@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -7,8 +8,11 @@ import {
   CheckCircle2,
   Globe,
   Handshake,
+  LayoutDashboard,
   MessageCircle,
+  Monitor,
   Printer,
+  Smartphone,
   Sparkles,
   XCircle,
 } from 'lucide-react'
@@ -67,6 +71,35 @@ const FEATURES = [
     icon: Printer,
     title: 'Laporan Mutasi & Cetak Nota Otomatis',
     desc: 'Cetak invoice/kuitansi transaksi instan dalam sekali klik serta pantau margin laba kotor unit yang terjual.',
+  },
+]
+
+const SHOWCASE_ITEMS = [
+  {
+    title: 'Portal Kerja & Toko Online Marketing',
+    icon: Smartphone,
+    deviceLabel: 'Tampilan Laptop',
+    deviceIcon: Monitor,
+    src: 'https://imgg.fr/r/mipKFGNL.png',
+    alt: 'Tampilan web katalog MotoStock versi desktop: katalog unit motor dengan foto, harga, dan tombol chat WhatsApp',
+    points: [
+      'Otomatis terhubung ke nomor WhatsApp masing-masing marketing.',
+      'Tombol tahan unit (booking) instan, materi iklan, dan salin teks caption promosi.',
+      'Optimal dan ringan diakses lewat browser smartphone.',
+    ],
+  },
+  {
+    title: 'Dashboard Manajemen Showroom & Katalog Publik',
+    icon: LayoutDashboard,
+    deviceLabel: 'Tampilan HP',
+    deviceIcon: Smartphone,
+    src: 'https://imgg.fr/r/wK0XO9xZ.png',
+    alt: 'Tampilan web katalog MotoStock versi ponsel: grid unit motor responsif dengan status unit real-time',
+    points: [
+      'Kontrol stok multi-cabang, mutasi kas, dan laporan laba kotor.',
+      'Tampilan katalog motor interaktif dengan foto jernih dan status unit real-time.',
+      'Hak akses terpisah antara owner, admin cabang, dan tim marketing.',
+    ],
   },
 ]
 
@@ -359,6 +392,78 @@ export default function HomePage() {
                   {f.title}
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{f.desc}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ Preview Tampilan (Showcase Screenshot) ============ */}
+      <section id="preview" className="scroll-mt-20">
+        <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:py-16">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">
+              Preview Sistem
+            </p>
+            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+              Tampilan Antarmuka Modern, Cepat, dan Siap Pakai di HP Maupun Laptop
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              Dirancang khusus agar pemilik showroom dan tim marketing bisa mengelola stok serta
+              membagikan katalog semudah menggunakan aplikasi chat.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-2 lg:gap-8">
+            {SHOWCASE_ITEMS.map((item) => (
+              <article
+                key={item.title}
+                className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md sm:p-6"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <item.icon className="h-5 w-5" aria-hidden />
+                  </div>
+                  <h3 className="text-sm font-extrabold leading-snug text-slate-900 sm:text-base">
+                    {item.title}
+                  </h3>
+                </div>
+
+                {/* Frame mockup ala jendela browser/device */}
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl md:p-3">
+                  <div aria-hidden className="flex items-center gap-1.5 px-1.5 pb-2">
+                    <span className="h-2 w-2 rounded-full bg-red-400" />
+                    <span className="h-2 w-2 rounded-full bg-amber-400" />
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span className="ml-1.5 truncate rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-500 sm:text-[10px]">
+                      motostock.id/s/byan-jaya-motor
+                    </span>
+                  </div>
+                  <div className="relative h-64 overflow-hidden rounded-xl border border-slate-100 bg-slate-50 sm:h-72 lg:h-80">
+                    <Image
+                      src={item.src}
+                      alt={item.alt}
+                      fill
+                      sizes="(min-width: 1024px) 45vw, 100vw"
+                      className="object-cover object-top"
+                    />
+                    <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-slate-950/80 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-white backdrop-blur sm:text-[10px]">
+                      <item.deviceIcon className="h-3 w-3" aria-hidden /> {item.deviceLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <ul className="mt-4 space-y-2.5">
+                  {item.points.map((p) => (
+                    <li
+                      key={p}
+                      className="flex items-start gap-2 text-xs leading-relaxed text-slate-600 sm:text-sm"
+                    >
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                      <span className="font-medium">{p}</span>
+                    </li>
+                  ))}
+                </ul>
               </article>
             ))}
           </div>

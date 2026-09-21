@@ -931,3 +931,22 @@ Stage Summary:
 - Semua 6 tab admin kini konsisten max-w-7xl px-10 dgn elemen desktop besar (tabel baris 64px+, angka font-black, input 48px, tombol aksi 40-48px) sementara mobile 390px identik dengan sebelumnya
 - Fitur baru ikut terbangun: filter periode riwayat mutasi (dropdown + date range), kolom kode referral MKT di tabel marketing, pratinjau logo besar dgn Ganti/Hapus di Pengaturan
 - Field "Rekening Bank" dari spec TIDAK ditambahkan (butuh perubahan schema DB + API + tampilan katalog — di luar lingkup UI scale up); "Cetak PDF" diganti label Ekspor Laporan (CSV) sesuai fitur yang ada
+
+---
+Task ID: landing-preview-showcase
+Agent: main (Z.ai Code)
+Task: Tambahkan section Preview Tampilan / Showcase Screenshot (2 gambar imgg.fr) pada Landing Page utama (src/app/page.tsx) antara Fitur dan Harga
+
+Work Log:
+- Inspeksi aset remote: mipKFGNL.png = 2174x2570 (tampilan DESKTOP katalog, rasio ~1:1.18), wK0XO9xZ.png = 1376x3411 (tampilan MOBILE katalog, rasio ~1:2.5); keduanya HTTP 200 (cloudflare, PNG 4.8MB & 5.4MB)
+- next.config.ts: tambah remotePatterns { https, hostname imgg.fr, pathname /r/** } agar next/image bisa optimalkan; dev server auto-restart terdeteksi di dev.log
+- page.tsx: import Image (next/image) + ikon baru LayoutDashboard/Monitor/Smartphone; tambah konstanta SHOWCASE_ITEMS (2 item: judul, ikon, label device, src, alt deskriptif, 3 poin bullet per spec)
+- Section baru id="preview" disisipkan DI ANTARA section Fitur (#fitur) dan Harga (#harga): eyebrow "PREVIEW SISTEM", heading "Tampilan Antarmuka Modern, Cepat, dan Siap Pakai di HP Maupun Laptop", subheading sesuai spec; grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8
+- Kartu: article rounded-2xl border-slate-200 bg-white p-5 sm:p-6 shadow-sm hover:shadow-md + header ikon chip + judul; frame mockup ala browser (rounded-2xl border p-2 md:p-3 shadow-xl bg-white + chrome bar 3 dot + URL pill "motostock.id/s/byan-jaya-motor" aria-hidden); area gambar relative h-64 sm:h-72 lg:h-80 overflow-hidden rounded-xl + Image fill sizes="(min-width: 1024px) 45vw, 100vw" className="object-cover object-top" (crop atas tanpa distorsi, kedua kartu tinggi sama); badge overlay "Tampilan Laptop/HP" (bg-slate-950/80 backdrop-blur) utk menegaskan konteks screenshot; 3 bullet Check emerald per kartu
+- E2E agent-browser 1440px: section render penuh (badge/heading/subheading/2 kartu berdampingan/frame+URL pill/badge device/3 bullet masing2), transisi mulus ke section Harga; next/image optimizer HTTP 200 (241KB & 375KB dari asli ~5MB); 0 console error
+- E2E mobile 390px: tumpuk 1 kolom vertikal, hScroll FALSE (scrollW=clientW=390), gambar & bullet terbaca
+- Lint 0 error; tsc --noEmit 0 error di src/
+
+Stage Summary:
+- Landing Page kini punya section bukti visual ("Preview Sistem") sebelum Pricing — memakai next/image teroptimasi dgn domain imgg.fr di-whitelist di next.config.ts
+- Catatan: kedua screenshot sebenarnya menampilkan KATALOG PUBLIK (desktop & mobile view) — label kartu mengikuti spec user; URL gambar mudah diganti lewat konstanta SHOWCASE_ITEMS di src/app/page.tsx jika mau screenshot Portal/Dashboard asli
