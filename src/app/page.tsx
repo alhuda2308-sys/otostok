@@ -75,12 +75,14 @@ const FEATURES = [
 ]
 
 const SHOWCASE_ITEMS = [
+  // Aset statis LOKAL (public/showcase/) — bukan remote host, agar tidak pernah
+  // 404/timeout optimizer saat deploy ke Vercel.
   {
     title: 'Portal Kerja & Toko Online Marketing',
     icon: Smartphone,
     deviceLabel: 'Tampilan Laptop',
     deviceIcon: Monitor,
-    src: 'https://imgg.fr/r/mipKFGNL.png',
+    src: '/showcase/katalog-desktop.jpg',
     alt: 'Tampilan web katalog MotoStock versi desktop: katalog unit motor dengan foto, harga, dan tombol chat WhatsApp',
     points: [
       'Otomatis terhubung ke nomor WhatsApp masing-masing marketing.',
@@ -93,7 +95,7 @@ const SHOWCASE_ITEMS = [
     icon: LayoutDashboard,
     deviceLabel: 'Tampilan HP',
     deviceIcon: Smartphone,
-    src: 'https://imgg.fr/r/wK0XO9xZ.png',
+    src: '/showcase/katalog-mobile.jpg',
     alt: 'Tampilan web katalog MotoStock versi ponsel: grid unit motor responsif dengan status unit real-time',
     points: [
       'Kontrol stok multi-cabang, mutasi kas, dan laporan laba kotor.',
