@@ -6,7 +6,8 @@ export const runtime = 'nodejs'
 /**
  * POST /api/ai/generate-copy — Marketing Kit AI Generator (khusus Super Admin).
  *
- * Memanggil Gemini REST API native (gemini-1.5-flash, fallback gemini-2.0-flash)
+ * Memanggil Gemini REST API native (gemini-2.5-flash — model resmi aktif
+ * sesuai instruksi respon Google; gemini-1.5/2.0-flash sudah usang)
  * di sisi SERVER:
  * - API key TIDAK PERNAH dikirim ke client bundle; diambil dari env
  *   GEMINI_API_KEY, atau ditimpa sementara oleh `apiKey` dari body request
@@ -21,9 +22,10 @@ export const runtime = 'nodejs'
  * Return: { text } (markdown) atau { error } dengan pesan yang jelas.
  */
 
-/** Model utama (stabil & cepat). Bila tak tersedia utk API Key → fallback. */
-const GEMINI_PRIMARY_MODEL = 'gemini-1.5-flash'
-const GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash'
+/** Model resmi aktif Google AI Studio.
+ *  Respon resmi Google: models/gemini-1.5-flash & models/gemini-2.0-flash
+ *  no longer available — wajib pakai models/gemini-2.5-flash. */
+const GEMINI_MODEL = 'gemini-2.5-flash'
 const TIMEOUT_MS = 60_000
 
 /** Endpoint REST resmi Google AI: .../v1beta/models/<model>:generateContent
@@ -170,9 +172,9 @@ export async function POST(req: Request) {
   })
 
   try {
-    // Percobaan 1 — model utama (endpoint: models/gemini-1.5-flash).
-    let usedModel = GEMINI_PRIMARY_MODEL
-    let res = await fetch(geminiUrl(usedModel, key), {
+    // Endpoint resmi Google: models/gemini-2.5-flash:generateContent
+    // (key via query param ?key= DAN header x-goog-api-key — dual-mode).
+    const res = await fetch(geminiUrl(GEMINI_MODEL, key), {
       method: 'POST',
       signal: controller.signal,
       headers: {
@@ -182,23 +184,7 @@ export async function POST(req: Request) {
       },
       body: requestBody,
     })
-    let payload: unknown = await res.json().catch(() => null)
-
-    // Fallback — bila model utama 404 (tidak tersedia untuk API Key ini),
-    // coba sekali lagi dengan model cadangan gemini-2.0-flash.
-    if (!res.ok && res.status === 404 && GEMINI_FALLBACK_MODEL) {
-      usedModel = GEMINI_FALLBACK_MODEL
-      res = await fetch(geminiUrl(usedModel, key), {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': key,
-        },
-        body: requestBody,
-      })
-      payload = await res.json().catch(() => null)
-    }
+    const payload: unknown = await res.json().catch(() => null)
 
     if (!res.ok) {
       // TRANSPARAN (debugging): teruskan PESAN ASLI dari Google apa adanya
@@ -212,7 +198,7 @@ export async function POST(req: Request) {
         {
           error: apiMessage || res.statusText || `Google menolak request (HTTP ${res.status})`,
           code: `GEMINI_${res.status}`,
-          model: usedModel,
+          model: GEMINI_MODEL,
         },
         { status: 502 },
       )
@@ -241,7 +227,7 @@ export async function POST(req: Request) {
       )
     }
 
-    return NextResponse.json({ text, model: usedModel })
+    return NextResponse.json({ text, model: GEMINI_MODEL })
   } catch (e) {
     const aborted = e instanceof Error && e.name === 'AbortError'
     return NextResponse.json(

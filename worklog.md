@@ -1021,3 +1021,23 @@ Stage Summary:
 - Endpoint Gemini kompatibel format API Key baru 'AQ.' (auth dual-mode: query param + header).
 - Error Google tidak lagi di-masking — pesan asli diteruskan ke UI Super Admin untuk debugging transparan.
 - Fallback gemini-2.0-flash saat 404 tetap aktif; kontrak API tidak berubah.
+
+---
+Task ID: update-gemini-2-5-flash
+Agent: Z.ai Code (orchestrator)
+Task: Ganti model Gemini ke gemini-2.5-flash sesuai instruksi respon resmi Google (model lama no longer available)
+
+Work Log:
+- Google merespon: "This model models/gemini-2.0-flash is no longer available. Please update your code to use models/gemini-2.5-flash" — semua model lama (1.5/2.0-flash) usang.
+- route.ts: konstanta kembali satu GEMINI_MODEL = 'gemini-2.5-flash'; GEMINI_PRIMARY_MODEL & GEMINI_FALLBACK_MODEL dihapus.
+- Seluruh logika fallback (retry gemini-2.0-flash saat 404) DIHAPUS — kini single call langsung ke endpoint resmi: v1beta/models/gemini-2.5-flash:generateContent?key=<apiKey>.
+- Dual-mode auth dipertahankan: query param ?key= + header x-goog-api-key sekaligus.
+- Error transparan dipertahankan: pesan asli Google (error.message || statusText) + code GEMINI_<status> + model diteruskan ke client tanpa masking.
+- Body native REST tetap standar: contents[].parts[].text (+ systemInstruction & generationConfig — field valid native endpoint).
+- UI marketing-kit-ai.tsx: komentar + label form diganti "gemini-2.5-flash".
+- Verifikasi: lint bersih; tsc 0 error di src/; grep memastikan tidak ada lagi referensi kode ke 1.5/2.0-flash (hanya catatan historis di komentar); E2E curl dgn key palsu → model:"gemini-2.5-flash" + pesan asli Google diteruskan — bukti endpoint baru aktif.
+
+Stage Summary:
+- Endpoint Gemini resmi: models/gemini-2.5-flash:generateContent (model aktif Google, fallback usang dihapus).
+- Arsitektur request lebih sederhana: single fetch tanpa fallback, auth dual-mode, error transparan.
+- Kontrak API tidak berubah; badge UI menampilkan model sesungguhnya.

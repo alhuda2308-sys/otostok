@@ -24,8 +24,8 @@ import { copyToClipboard } from '@/lib/format'
 /**
  * Tab "Marketing Kit AI" di panel Super Admin.
  *
- * Generator copywriting promosi MotoStock via Gemini AI (gemini-1.5-flash,
- * fallback otomatis ke gemini-2.0-flash bila model utama tak tersedia).
+ * Generator copywriting promosi MotoStock via Gemini AI (gemini-2.5-flash,
+ * model resmi aktif — fallback lama ke 1.5/2.0-flash sudah dihapus).
  * Semua pemanggilan AI terjadi di server (/api/ai/generate-copy) — API key
  * dari form hanya dikirim sekali per request dan tidak pernah disimpan.
  */
@@ -189,7 +189,7 @@ export function MarketingKitAi() {
           <Sparkles className="h-4 w-4 text-blue-700" aria-hidden /> Generator Marketing Kit
         </h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Diproses Gemini AI (<span className="font-mono font-bold">gemini-1.5-flash</span>) di
+          Diproses Gemini AI (<span className="font-mono font-bold">gemini-2.5-flash</span>) di
           sisi server.
         </p>
 
