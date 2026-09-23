@@ -965,3 +965,23 @@ Work Log:
 Stage Summary:
 - Hero kini menampilkan unit nyata dari katalog demo; aset statis lokal (public/hero/) — tanpa dependensi remote, tetap ringan
 - Push: commit hero-real-photos ke origin/main (kredensial sudah disimpan via git credential store)
+
+---
+Task ID: super-admin-marketing-kit-ai
+Agent: main (Z.ai Code)
+Task: (a) Perbaiki gambar pecah di landing page; (b) Buat fitur Marketing Kit AI Generator di /super-admin dengan Gemini AI
+
+Work Log:
+- AUDIT GAMBAR: scan seluruh <img> landing page via browser eval (naturalWidth) — logo icon-1024.png sehat di lokal & produksi (HTTP 200, ter-track git); yang PECAH = screenshot showcase dari imgg.fr (optimizer Next 4.9s utk source 5.4MB; di Vercel cold-fetch sering timeout -> broken image). logo.svg ternyata SVG animasi lain (bukan logo MotoStock) — tidak dipakai
+- FIX: kedua screenshot diunduh ulang, dikompres PIL -> public/showcase/katalog-desktop.jpg (1600px, 357KB) & katalog-mobile.jpg (1200px, 476KB); SHOWCASE_ITEMS diganti ke path lokal; verifikasi ulang 6/6 img ok:true; commit b43e3ee (direbase di atas README.md bfb883c dari GitHub -> push 56564f4)
+- FITUR AI: API route baru /api/ai/generate-copy (runtime nodejs) — auth isSuperAuthorized (cookie otostok_sa), Gemini REST gemini-2.5-flash via fetch (x-goog-api-key header, system instruction copywriter B2B SaaS otomotif sesuai spec + konteks produk MotoStock), 5 channel (wa_broadcast/ig_fb_caption/tiktok_reels/meta_google_ads/edukasi_softselling) dgn directive format masing2, 3 tone (santai/formal/hardselling), input opsional promo/target, prioritas key: form apiKey (override sekali pakai) -> env GEMINI_API_KEY; error mapping ramah: 400 invalid key / 429 kuota / 403 / 503 / 404 / timeout 60s / empty result; key TIDAK pernah ke client bundle/log
+- UI: file baru super-admin/marketing-kit-ai.tsx — pill selector channel (ikon lucide) & tone, input opsional + API key (type password, hint menimpa env), tombol Generate dgn spinner, hasil dirender react-markdown (styling manual h1-h3/p/ul/ol/strong/blockquote/code/pre), box scroll max-h-[34rem], aksi cepat: Salin Teks (copyToClipboard+toast "Tersalin ke clipboard"), Test Kirim ke WhatsApp (wa.me/?text=), Regenerate (params sama)
+- super-admin-client.tsx: tab nav baru (role=tablist): "Lisensi & Monitoring" | "Marketing Kit AI" (Sparkles icon); konten lisensi dibungkus conditional; state tab
+- E2E: login super-admin via env secret; tab switch OK; form lengkap (5 channel+3 tone+3 input+generate); TEST TANPA KEY -> pesan NO_API_KEY tampil; TEST KEY PALSU -> server memanggil Gemini sungguhan, error 400 diterjemahkan "API Key Gemini tidak valid"; mobile 390px 0 hScroll; dev.log bersih (POST /api/ai/generate-copy 400 sesuai ekspektasi)
+- Lint 0 error; tsc 0 error di src/
+- CATATAN: generasi AI sungguhan BELUM bisa diuji (belum ada GEMINI_API_KEY valid) — user perlu set env di Vercel ATAU tempel key di form
+
+Stage Summary:
+- Landing page bebas gambar pecah (semua aset kini lokal statis)
+- Panel Super Admin punya 2 tab: lisensi + Marketing Kit AI Generator (Gemini server-side, key aman, error handling lengkap, output markdown siap salin/WA/regenerate)
+- Sandbox berulang kali menghapus src/app/api/upload/route.ts dari disk — sudah dipulihkan lg (git restore); perlu waspada tiap sesi
