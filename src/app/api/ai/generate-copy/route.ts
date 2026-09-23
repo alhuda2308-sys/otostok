@@ -6,7 +6,8 @@ export const runtime = 'nodejs'
 /**
  * POST /api/ai/generate-copy — Marketing Kit AI Generator (khusus Super Admin).
  *
- * Memanggil Gemini REST API (gemini-2.5-flash) di sisi SERVER:
+ * Memanggil Gemini REST API (gemini-1.5-flash, fallback gemini-2.0-flash)
+ * di sisi SERVER:
  * - API key TIDAK PERNAH dikirim ke client bundle; diambil dari env
  *   GEMINI_API_KEY, atau ditimpa sementara oleh `apiKey` dari body request
  *   (input opsional di UI Super Admin — dipakai sekali, tidak disimpan).
@@ -17,9 +18,15 @@ export const runtime = 'nodejs'
  * Return: { text } (markdown) atau { error } dengan pesan yang jelas.
  */
 
-const GEMINI_MODEL = 'gemini-2.5-flash'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+/** Model utama (stabil & cepat). Bila tak tersedia utk API Key → fallback. */
+const GEMINI_PRIMARY_MODEL = 'gemini-1.5-flash'
+const GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash'
 const TIMEOUT_MS = 60_000
+
+/** Endpoint REST resmi Google AI: .../v1beta/models/<model>:generateContent */
+function geminiUrl(model: string): string {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+}
 
 /** System instruction — copywriter SaaS B2B otomotif (sesuai spesifikasi). */
 const SYSTEM_INSTRUCTION = `Anda adalah Copywriter Kelas Dunia spesialis B2B & Software SaaS untuk industri Otomotif (Showroom Motor Bekas di Indonesia). Gaya bahasa persuasif, berbobot, to-the-point, dan berorientasi pada peningkatan penjualan serta efisiensi operasional showroom.
@@ -91,7 +98,7 @@ function unauthorized() {
 }
 
 /** Pesan error Gemini yang ramah untuk ditampilkan di UI. */
-function friendlyGeminiError(status: number, apiMessage: string): string {
+function friendlyGeminiError(status: number, apiMessage: string, model: string): string {
   if (status === 400 && /api key/i.test(apiMessage)) {
     return 'API Key Gemini tidak valid atau tidak berlaku. Periksa kembali API Key (input form menimpa env GEMINI_API_KEY untuk request ini).'
   }
@@ -105,7 +112,7 @@ function friendlyGeminiError(status: number, apiMessage: string): string {
     return 'Model AI sedang sibuk / gangguan sementara. Coba lagi beberapa saat (tombol Regenerate).'
   }
   if (status === 404) {
-    return `Model ${GEMINI_MODEL} tidak tersedia untuk API Key ini. Pastikan API Key berasal dari Google AI Studio.`
+    return `Model ${model} tidak tersedia untuk API Key ini. Pastikan API Key berasal dari Google AI Studio.`
   }
   const trimmed = apiMessage.trim().slice(0, 240)
   return `Gemini AI menolak request (HTTP ${status}).${trimmed ? ` Detail: ${trimmed}` : ''}`
@@ -166,8 +173,19 @@ export async function POST(req: Request) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
+  const requestBody = JSON.stringify({
+    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+    generationConfig: {
+      temperature: 1, // variasi cukup untuk tombol Regenerate
+      maxOutputTokens: 2048,
+    },
+  })
+
   try {
-    const res = await fetch(GEMINI_URL, {
+    // Percobaan 1 — model utama (endpoint: models/gemini-1.5-flash).
+    let usedModel = GEMINI_PRIMARY_MODEL
+    let res = await fetch(geminiUrl(usedModel), {
       method: 'POST',
       signal: controller.signal,
       headers: {
@@ -175,17 +193,25 @@ export async function POST(req: Request) {
         // Key lewat header — tidak ikut tampil di URL/log akses.
         'x-goog-api-key': key,
       },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        generationConfig: {
-          temperature: 1, // variasi cukup untuk tombol Regenerate
-          maxOutputTokens: 2048,
-        },
-      }),
+      body: requestBody,
     })
+    let payload: unknown = await res.json().catch(() => null)
 
-    const payload: unknown = await res.json().catch(() => null)
+    // Fallback — bila model utama 404 (tidak tersedia untuk API Key ini),
+    // coba sekali lagi dengan model cadangan gemini-2.0-flash.
+    if (!res.ok && res.status === 404 && GEMINI_FALLBACK_MODEL) {
+      usedModel = GEMINI_FALLBACK_MODEL
+      res = await fetch(geminiUrl(usedModel), {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key,
+        },
+        body: requestBody,
+      })
+      payload = await res.json().catch(() => null)
+    }
 
     if (!res.ok) {
       const apiMessage =
@@ -193,7 +219,10 @@ export async function POST(req: Request) {
           ? String((payload as { error?: { message?: string } }).error?.message ?? '')
           : ''
       return NextResponse.json(
-        { error: friendlyGeminiError(res.status, apiMessage), code: `GEMINI_${res.status}` },
+        {
+          error: friendlyGeminiError(res.status, apiMessage, usedModel),
+          code: `GEMINI_${res.status}`,
+        },
         { status: 502 },
       )
     }
@@ -221,7 +250,7 @@ export async function POST(req: Request) {
       )
     }
 
-    return NextResponse.json({ text, model: GEMINI_MODEL })
+    return NextResponse.json({ text, model: usedModel })
   } catch (e) {
     const aborted = e instanceof Error && e.name === 'AbortError'
     return NextResponse.json(

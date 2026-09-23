@@ -985,3 +985,21 @@ Stage Summary:
 - Landing page bebas gambar pecah (semua aset kini lokal statis)
 - Panel Super Admin punya 2 tab: lisensi + Marketing Kit AI Generator (Gemini server-side, key aman, error handling lengkap, output markdown siap salin/WA/regenerate)
 - Sandbox berulang kali menghapus src/app/api/upload/route.ts dari disk — sudah dipulihkan lg (git restore); perlu waspada tiap sesi
+
+---
+Task ID: fix-gemini-model-name
+Agent: Z.ai Code (orchestrator)
+Task: Perbaiki penamaan model Gemini di /api/ai/generate-copy (error "Model gemini-2.5-flash tidak tersedia untuk API Key ini")
+
+Work Log:
+- Grep semua referensi "gemini-2.5-flash" di src/ — ditemukan di route.ts (konstanta model + komentar + pesan error 404) dan marketing-kit-ai.tsx (komentar + label UI).
+- route.ts: GEMINI_MODEL diganti GEMINI_PRIMARY_MODEL = 'gemini-1.5-flash' + GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash'.
+- Tambah helper geminiUrl(model) → endpoint REST resmi `.../v1beta/models/<model>:generateContent` (URL kini eksplisit models/gemini-1.5-flash).
+- Implementasi fallback otomatis: bila model utama return HTTP 404 (tidak tersedia utk API Key), request diulang SEKALI dengan gemini-2.0-flash (requestBody sama, AbortController sama).
+- friendlyGeminiError() kini menerima parameter model yang benar-benar dipakai; response sukses mengembalikan `model: usedModel` (badge UI dinamis sudah membaca field ini — otomatis tampil model aktual termasuk saat fallback).
+- marketing-kit-ai.tsx: komentar + label UI diganti gemini-1.5-flash (dengan catatan fallback).
+- Verifikasi: bun run lint bersih; bunx tsc --noEmit 0 error di src/; E2E curl POST /api/ai/generate-copy (auth ?key=) dgn API key palsu → request tiba di Google endpoint baru, error 400 ditangani graceful dgn pesan ramah (bukti jalur request + fallback logic berjalan tanpa runtime error).
+
+Stage Summary:
+- Root cause "Model tidak tersedia" teratasi: model utama kini gemini-1.5-flash (stabil & cepat, tersedia luas utk API Key Google AI Studio), fallback otomatis gemini-2.0-flash bila 404.
+- Tidak ada perubahan kontrak API (body/response sama); UI badge model tampil dinamis sesuai model yang dipakai server.
