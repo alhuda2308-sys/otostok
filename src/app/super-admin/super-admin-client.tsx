@@ -17,7 +17,6 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
-  Sparkles,
   Store,
   Ticket,
   Trash2,
@@ -52,7 +51,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { MarketingKitAi } from './marketing-kit-ai'
 
 /** Sesi Super Admin disimpan di sessionStorage (hilang saat tab ditutup). */
 const SESSION_KEY = 'otostok_sa_key'
@@ -191,8 +189,6 @@ export function SuperAdminClient() {
   // Per-baris busy state utk aksi cepat
   const [busyId, setBusyId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SuperLicenseRow | null>(null)
-  /** Tab panel aktif: lisensi (default) atau Marketing Kit AI. */
-  const [tab, setTab] = useState<'lisensi' | 'marketing-kit'>('lisensi')
   const secretRef = useRef<string | null>(null)
 
   const refetch = useCallback(async () => {
@@ -555,34 +551,7 @@ export function SuperAdminClient() {
         </Button>
       </div>
 
-      {/* Navigasi tab panel */}
-      <div role="tablist" aria-label="Menu Super Admin" className="mt-4 flex flex-wrap gap-2">
-        {(
-          [
-            { id: 'lisensi', label: 'Lisensi & Monitoring' },
-            { id: 'marketing-kit', label: 'Marketing Kit AI' },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={`inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-xs font-extrabold transition-colors sm:text-sm ${
-              tab === t.id
-                ? 'bg-blue-700 text-white shadow-sm hover:bg-blue-600'
-                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {t.id === 'marketing-kit' && <Sparkles className="h-4 w-4" aria-hidden />}
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'lisensi' && (
-        <>
+      {/* Konten utama: Lisensi & Monitoring (murni, tanpa tab lain) */}
       {/* Kartu statistik */}
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -795,10 +764,6 @@ export function SuperAdminClient() {
           )}
         </section>
       </div>
-        </>
-      )}
-
-      {tab === 'marketing-kit' && <MarketingKitAi />}
 
       {/* Dialog konfirmasi hapus permanen */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>

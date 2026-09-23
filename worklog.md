@@ -1041,3 +1041,20 @@ Stage Summary:
 - Endpoint Gemini resmi: models/gemini-2.5-flash:generateContent (model aktif Google, fallback usang dihapus).
 - Arsitektur request lebih sederhana: single fetch tanpa fallback, auth dual-mode, error transparan.
 - Kontrak API tidak berubah; badge UI menampilkan model sesungguhnya.
+
+---
+Task ID: remove-marketing-kit-ai
+Agent: Z.ai Code (orchestrator)
+Task: Hapus sepenuhnya fitur Marketing Kit AI dari panel Super Admin (backend + frontend + dependency)
+
+Work Log:
+- Backend: git rm -r src/app/api/ai/ (termasuk generate-copy/route.ts) — endpoint AI hilang total (curl → 404).
+- Frontend: git rm src/app/super-admin/marketing-kit-ai.tsx (komponen tab generator + box hasil).
+- super-admin-client.tsx dibersihkan total: import MarketingKitAi, icon Sparkles (khusus tab AI), state `tab`/`setTab`, tablist navigasi, wrapper kondisional {tab === 'lisensi'} & render {tab === 'marketing-kit'} — panel kembali murni "Lisensi & Monitoring" tanpa tab.
+- Dependency: bun remove react-markdown (terpasang khusus utk render hasil markdown AI, satu-satunya pemakai adalah marketing-kit-ai.tsx). Tidak ada SDK AI lain di package.json (fitur memakai REST fetch murni).
+- Verifikasi: grep src/ → 0 referensi marketing-kit/gemini/react-markdown; lint bersih; tsc 0 error di src/; E2E agent-browser: login /super-admin → panel langsung menampilkan statistik + Generator Lisensi + Monitoring tanpa tab, 0 teks AI tersisa, 0 console error; GET /super-admin 200, GET / 200, GET /api/ai/generate-copy 404 (sesuai harapan).
+
+Stage Summary:
+- Fitur Marketing Kit AI dihapus lengkap: route API, komponen UI, state/logic tab, dependency react-markdown.
+- Panel Super Admin kembali murni "Lisensi & Monitoring" (tampilan & kontrak API lain tidak berubah).
+- Tidak ada import gantung / dead code tersisa.
