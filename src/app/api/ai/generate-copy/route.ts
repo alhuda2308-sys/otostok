@@ -6,13 +6,16 @@ export const runtime = 'nodejs'
 /**
  * POST /api/ai/generate-copy — Marketing Kit AI Generator (khusus Super Admin).
  *
- * Memanggil Gemini REST API (gemini-1.5-flash, fallback gemini-2.0-flash)
+ * Memanggil Gemini REST API native (gemini-1.5-flash, fallback gemini-2.0-flash)
  * di sisi SERVER:
  * - API key TIDAK PERNAH dikirim ke client bundle; diambil dari env
  *   GEMINI_API_KEY, atau ditimpa sementara oleh `apiKey` dari body request
  *   (input opsional di UI Super Admin — dipakai sekali, tidak disimpan).
+ *   Tidak ada validasi format awalan key — key baru 'AQ.' & lama 'AIza' lolos.
  * - Auth: cookie sesi otostok_sa (isSuperAuthorized) — sama dengan route
  *   super-admin lainnya.
+ * - ERROR TRANSPARAN: bila Google menolak request, PESAN ASLI dari Google
+ *   diteruskan apa adanya ke client untuk debugging (tidak di-masking).
  *
  * Body  : { channel, tone, promo?, target?, apiKey? }
  * Return: { text } (markdown) atau { error } dengan pesan yang jelas.
@@ -23,9 +26,14 @@ const GEMINI_PRIMARY_MODEL = 'gemini-1.5-flash'
 const GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash'
 const TIMEOUT_MS = 60_000
 
-/** Endpoint REST resmi Google AI: .../v1beta/models/<model>:generateContent */
-function geminiUrl(model: string): string {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+/** Endpoint REST resmi Google AI: .../v1beta/models/<model>:generateContent
+ *  API key dikirim DUA arah sekaligus (dual-mode auth):
+ *  - query param ?key= — kompatibel format key BARU Google AI Studio
+ *    berawalan 'AQ.' maupun key lama 'AIza...';
+ *  - header x-goog-api-key — jalur utama, tidak ikut tampil di log akses URL.
+ *  Google menerima salah satu / keduanya. */
+function geminiUrl(model: string, apiKey: string): string {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
 }
 
 /** System instruction — copywriter SaaS B2B otomotif (sesuai spesifikasi). */
@@ -97,27 +105,6 @@ function unauthorized() {
   )
 }
 
-/** Pesan error Gemini yang ramah untuk ditampilkan di UI. */
-function friendlyGeminiError(status: number, apiMessage: string, model: string): string {
-  if (status === 400 && /api key/i.test(apiMessage)) {
-    return 'API Key Gemini tidak valid atau tidak berlaku. Periksa kembali API Key (input form menimpa env GEMINI_API_KEY untuk request ini).'
-  }
-  if (status === 429) {
-    return 'Kuota / rate limit Gemini AI habis untuk API Key ini. Tunggu beberapa saat, atau gunakan API Key lain lewat form.'
-  }
-  if (status === 403) {
-    return 'API Key ditolak (403). Pastikan Generative Language API aktif untuk project Google AI Studio pemilik key.'
-  }
-  if (status === 503 || status === 500) {
-    return 'Model AI sedang sibuk / gangguan sementara. Coba lagi beberapa saat (tombol Regenerate).'
-  }
-  if (status === 404) {
-    return `Model ${model} tidak tersedia untuk API Key ini. Pastikan API Key berasal dari Google AI Studio.`
-  }
-  const trimmed = apiMessage.trim().slice(0, 240)
-  return `Gemini AI menolak request (HTTP ${status}).${trimmed ? ` Detail: ${trimmed}` : ''}`
-}
-
 export async function POST(req: Request) {
   if (!isSuperAuthorized(req)) return unauthorized()
 
@@ -185,7 +172,7 @@ export async function POST(req: Request) {
   try {
     // Percobaan 1 — model utama (endpoint: models/gemini-1.5-flash).
     let usedModel = GEMINI_PRIMARY_MODEL
-    let res = await fetch(geminiUrl(usedModel), {
+    let res = await fetch(geminiUrl(usedModel, key), {
       method: 'POST',
       signal: controller.signal,
       headers: {
@@ -201,7 +188,7 @@ export async function POST(req: Request) {
     // coba sekali lagi dengan model cadangan gemini-2.0-flash.
     if (!res.ok && res.status === 404 && GEMINI_FALLBACK_MODEL) {
       usedModel = GEMINI_FALLBACK_MODEL
-      res = await fetch(geminiUrl(usedModel), {
+      res = await fetch(geminiUrl(usedModel, key), {
         method: 'POST',
         signal: controller.signal,
         headers: {
@@ -214,14 +201,18 @@ export async function POST(req: Request) {
     }
 
     if (!res.ok) {
+      // TRANSPARAN (debugging): teruskan PESAN ASLI dari Google apa adanya
+      // (errData?.error?.message || res.statusText) — TIDAK ditimpa/di-masking
+      // agar alasan penolakan pastinya terlihat di UI Super Admin.
       const apiMessage =
         payload && typeof payload === 'object' && 'error' in payload
           ? String((payload as { error?: { message?: string } }).error?.message ?? '')
           : ''
       return NextResponse.json(
         {
-          error: friendlyGeminiError(res.status, apiMessage, usedModel),
+          error: apiMessage || res.statusText || `Google menolak request (HTTP ${res.status})`,
           code: `GEMINI_${res.status}`,
+          model: usedModel,
         },
         { status: 502 },
       )

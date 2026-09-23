@@ -1003,3 +1003,21 @@ Work Log:
 Stage Summary:
 - Root cause "Model tidak tersedia" teratasi: model utama kini gemini-1.5-flash (stabil & cepat, tersedia luas utk API Key Google AI Studio), fallback otomatis gemini-2.0-flash bila 404.
 - Tidak ada perubahan kontrak API (body/response sama); UI badge model tampil dinamis sesuai model yang dipakai server.
+
+---
+Task ID: fix-gemini-aq-key-compat
+Agent: Z.ai Code (orchestrator)
+Task: Kompatibilitas Format API Key Baru Google AI Studio ('AQ.') + error transparan di /api/ai/generate-copy
+
+Work Log:
+- Audit seluruh repo: TIDAK ADA regex/validasi awalan 'AIza' di frontend maupun backend (input API key di UI adalah plain text tanpa format check) — key baru 'AQ.' otomatis lolos; ditambahkan catatan eksplisit di komentar & hint UI.
+- geminiUrl(model, apiKey): endpoint native kini menyertakan query param ?key=<apiKey> (encodeURIComponent) DAN header x-goog-api-key sekaligus (dual-mode auth — Google menerima keduanya; key 'AQ.' maupun 'AIza' didukung).
+- Hapus fungsi friendlyGeminiError() (masking). Block !res.ok kini TRANSPARAN: pesan asli Google (errData?.error?.message || res.statusText) diteruskan apa adanya ke client + code GEMINI_<status> + model yang dipakai — alasan penolakan pastinya terlihat untuk debugging.
+- Body native REST dipertahankan: contents[].parts[].text + systemInstruction + generationConfig (semuanya field valid native endpoint, bukan SDK wrapper) — struktur contents sesuai spesifikasi.
+- UI marketing-kit-ai.tsx: hint API Key diperbarui — "Format key lama (AIza…) maupun baru (AQ.) sama-sama diterima".
+- Verifikasi: lint bersih; tsc 0 error di src/; E2E curl dgn key palsu → respons kini berisi PESAN ASLI Google ("API key not valid. Please pass a valid API key.") + code GEMINI_400 + model — bukti dual-mode URL sampai ke Google & error transparan bekerja.
+
+Stage Summary:
+- Endpoint Gemini kompatibel format API Key baru 'AQ.' (auth dual-mode: query param + header).
+- Error Google tidak lagi di-masking — pesan asli diteruskan ke UI Super Admin untuk debugging transparan.
+- Fallback gemini-2.0-flash saat 404 tetap aktif; kontrak API tidak berubah.

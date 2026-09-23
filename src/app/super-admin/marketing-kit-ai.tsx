@@ -308,8 +308,9 @@ export function MarketingKitAi() {
               autoComplete="off"
             />
             <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-              Menimpa env GEMINI_API_KEY untuk request ini saja — tidak disimpan & tidak pernah
-              tampil di browser lain.
+              Format key lama (AIza…) maupun baru (AQ.) sama-sama diterima. Menimpa env
+              GEMINI_API_KEY untuk request ini saja — tidak disimpan & tidak pernah tampil di
+              browser lain.
             </p>
           </div>
         </fieldset>
